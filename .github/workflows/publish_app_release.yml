@@ -77,29 +77,7 @@ jobs:
             simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
             simple_live_app/build/app/outputs/flutter-apk/app-x86_64-debug.apk
 
-      #打包iOS
-      - name: Build IPA
-        run: |
-          cd simple_live_app
-          flutter build ios --release --no-codesign
-      
-      #创建未签名ipa
-      - name: Create IPA
-        run: |
-          cd simple_live_app
-          mkdir build/ios/iphoneos/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/Runner.app
-          cd build/ios/iphoneos/
-          zip -q -r ios_no_sign.ipa Payload
-          cd ../../..
-      
-      #上传IPA至Artifacts
-      - name: Upload IPA to Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios
-          path: |
-            simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
+      #iOS构建已移至单独的工作流 publish_ios_release.yml
       
       # 打包MAC
       - name: Build MacOS
@@ -127,21 +105,20 @@ jobs:
       - name: Echo version content
         run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
 
-      #上传至Release
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: "${{ fromJson(steps.version.outputs.content).version }}"
-          body: "${{ fromJson(steps.version.outputs.content).version_desc }}"
-          prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
-          token: ${{ secrets.TOKEN }}
-          files: |
-            simple_live_app/build/app/outputs/flutter-apk/app-x86_64-debug.apk
-            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
-            simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-debug.apk
-            simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
-            simple_live_app/build/dist/*/*.dmg
-            simple_live_app/build/dist/*/*.zip
+      #上传至Release - 临时禁用
+      # - name: Upload Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     name: "${{ fromJson(steps.version.outputs.content).version }}"
+      #     body: "${{ fromJson(steps.version.outputs.content).version_desc }}"
+      #     prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
+      #     token: ${{ secrets.TOKEN }}
+      #     files: |
+      #       simple_live_app/build/app/outputs/flutter-apk/app-x86_64-debug.apk
+      #       simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
+      #       simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-debug.apk
+      #       simple_live_app/build/dist/*/*.dmg
+      #       simple_live_app/build/dist/*/*.zip
       #完成
       - run: echo "🍏 This job's status is ${{ job.status }}."
 
@@ -202,17 +179,17 @@ jobs:
       - name: Echo version content
         run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
 
-      #上传至Release
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: "${{ fromJson(steps.version.outputs.content).version }}"
-          body: "${{ fromJson(steps.version.outputs.content).version_desc }}"
-          prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
-          token: ${{ secrets.TOKEN }}
-          files: |
-            simple_live_app/build/dist/*/*.deb
-            simple_live_app/build/dist/*/*.zip
+      #上传至Release - 临时禁用
+      # - name: Upload Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     name: "${{ fromJson(steps.version.outputs.content).version }}"
+      #     body: "${{ fromJson(steps.version.outputs.content).version_desc }}"
+      #     prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
+      #     token: ${{ secrets.TOKEN }}
+      #     files: |
+      #       simple_live_app/build/dist/*/*.deb
+      #       simple_live_app/build/dist/*/*.zip
         #完成
       - run: echo "🍏 Linux job's status is ${{ job.status }}."
 
@@ -267,17 +244,17 @@ jobs:
       - name: Echo version content
         run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
 
-      #上传至Release
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: "${{ fromJson(steps.version.outputs.content).version }}"
-          body: "${{ fromJson(steps.version.outputs.content).version_desc }}"
-          prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
-          token: ${{ secrets.TOKEN }}
-          files: |
-            simple_live_app/build/dist/*/*.msix
-            simple_live_app/build/dist/*/*.zip
+      #上传至Release - 临时禁用
+      # - name: Upload Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     name: "${{ fromJson(steps.version.outputs.content).version }}"
+      #     body: "${{ fromJson(steps.version.outputs.content).version_desc }}"
+      #     prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
+      #     token: ${{ secrets.TOKEN }}
+      #     files: |
+      #       simple_live_app/build/dist/*/*.msix
+      #       simple_live_app/build/dist/*/*.zip
 
       #完成
       - run: echo "🍏 Windows job's status is ${{ job.status }}."

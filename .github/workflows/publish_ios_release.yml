@@ -1,0 +1,85 @@
+name: ios-build-action
+#推送Tag时触发
+on:
+  push:
+    tags:
+      - "ios_*"
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      #签出代码 
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      #设置JAVA环境
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: "17"
+          cache: 'gradle'
+      
+      #设置Flutter
+      - name: Flutter action
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          cache: true 
+
+      #更新Flutter的packages
+      - name: Restore packages
+        run: |
+          cd simple_live_app
+          flutter pub get
+
+      #打包iOS
+      - name: Build IPA
+        run: |
+          cd simple_live_app
+          flutter build ios --release --no-codesign
+      
+      #创建未签名ipa
+      - name: Create IPA
+        run: |
+          cd simple_live_app
+          mkdir build/ios/iphoneos/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/Runner.app
+          cd build/ios/iphoneos/
+          zip -q -r ios_no_sign.ipa Payload
+          cd ../../..
+      
+      #上传IPA至Artifacts
+      - name: Upload IPA to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: |
+            simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
+
+      #读取版本信息
+      - name: Read version
+        id: version
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: assets/app_version.json
+      - name: Echo version
+        run: echo "${{ fromJson(steps.version.outputs.content).version }}"
+      - name: Echo version content
+        run: echo "${{ fromJson(steps.version.outputs.content).version_desc }}"
+
+      #上传至Release - 可选，需要配置TOKEN
+      # - name: Upload Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     name: "iOS ${{ fromJson(steps.version.outputs.content).version }}"
+      #     body: "# iOS版本\n${{ fromJson(steps.version.outputs.content).version_desc }}"
+      #     prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
+      #     token: ${{ secrets.TOKEN }}
+      #     files: |
+      #       simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
+
+      #完成
+      - run: echo "🍎 iOS build completed with status ${{ job.status }}."
