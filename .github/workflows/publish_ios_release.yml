@@ -1,93 +1,77 @@
-# 工作流程名称
-name: Build and Release iOS App
+name: ios-build-action
 
-# 触发条件：当一个以 'ios_' 开头的标签被推送到仓库时
+# 推送Tag时触发
 on:
   push:
     tags:
       - "ios_*"
 
-# 定义一个构建任务
 jobs:
-  build-and-release-ios:
-    # 任务名称
-    name: Build and Release iOS
-    # 使用 macOS 13 运行环境
+  build-ios:
+    # 使用一个具体的 macOS 版本以保证环境稳定
     runs-on: macos-13
 
-    # 为此任务授予写权限，以便能够创建 GitHub Release
     permissions:
       contents: write
 
     steps:
-      # 步骤 1: 签出你的仓库代码
+      # 步骤 1: 签出代码
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: master
 
-      # 步骤 2: 明确指定 Xcode 版本以保证构建环境的稳定性
+      # 步骤 2: 明确指定 Xcode 版本
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '15.2'
 
-      # 步骤 3: 设置 Flutter 环境
+      # 步骤 3: 设置 Java 环境
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: "17"
+
+      # 步骤 4: 设置 Flutter 环境
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.x'
           cache: true
 
-      # 步骤 4: 清理项目并获取 Flutter 依赖
+      # 步骤 5: 清理项目并获取 Flutter 依赖
       - name: Clean project and get Flutter packages
         run: |
           cd simple_live_app
           flutter clean
           flutter pub get
 
-      # 步骤 5: 修复 Podfile 并安装 iOS 依赖 (关键修复)
-      - name: Patch Podfile and install iOS dependencies
+      # 步骤 6: 修改现有的 post_install 钩子并安装 iOS Pods 依赖
+      - name: Prepare and install iOS dependencies
         run: |
           cd simple_live_app/ios
-          
-          # Podfile 已存在 post_install 块，我们不能添加第二个。
-          # 此脚本将我们的部署目标修复代码注入到现有的 post_install 块内部，
-          # 恰好在文件末尾的 'end' 关键字之前。
-
-          # 1. 复制除最后一行外的所有内容到临时文件
-          head -n -1 Podfile > Podfile.tmp
-          
-          # 2. 将我们的修复脚本追加到临时文件
-          echo "
-            # Injected by CI: Force all pods to iOS 12.0 deployment target
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
-              end
-            end
-          " >> Podfile.tmp
-          
-          # 3. 将原始文件的最后一行（'end'）追加回来
-          tail -n 1 Podfile >> Podfile.tmp
-          
-          # 4. 用修改后的临时文件替换原始 Podfile
-          mv Podfile.tmp Podfile
-          
-          echo "--- Patched Podfile Content ---"
-          cat Podfile
-          echo "-----------------------------"
-          
-          # 5. 现在，使用修复后的 Podfile 安装依赖
+          # 检查并修改现有的 post_install 钩子，确保设置了正确的部署目标
+          sed -i '' '/post_install do |installer|/,/end/c\
+          post_install do |installer|\
+            installer.pods_project.targets.each do |target|\
+              target.build_configurations.each do |config|\
+                config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = "12.0"\
+              end\
+            end\
+          end\
+          ' Podfile
+          # 现在 Generated.xcconfig 文件已存在，可以安全地运行 pod install
           pod install --repo-update
 
-      # 步骤 6: 构建 iOS 应用 (生成 .app 文件)
-      - name: Build iOS App
+      # 步骤 7: 打包 iOS 应用 (IPA)
+      - name: Build IPA
         run: |
           cd simple_live_app
           flutter build ios --release --no-codesign
 
-      # 步骤 7: 将 .app 文件打包成未签名的 .ipa
+      # 步骤 8: 创建未签名的 IPA 文件
       - name: Create unsigned IPA
         run: |
           cd simple_live_app
@@ -96,27 +80,37 @@ jobs:
           cd build/ios/iphoneos/
           zip -r ios_no_sign.ipa Payload
 
-      # 步骤 8: 读取版本信息文件
+      # 步骤 9: 上传 IPA 至 Artifacts
+      - name: Upload IPA to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
+
+      # 步骤 10: 读取版本信息
       - name: Read version information
         id: version
         uses: juliangruber/read-file-action@v1
         with:
           path: assets/app_version.json
 
-      # 步骤 9: 创建 GitHub Release 并上传 IPA 文件
-      - name: Create GitHub Release and Upload IPA
+      - name: Echo version details
+        run: |
+          echo "Version: ${{ fromJson(steps.version.outputs.content).version }}"
+          echo "Version Description: ${{ fromJson(steps.version.outputs.content).version_desc }}"
+
+      # 步骤 11: (可选) 上传至 Release
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           name: "iOS ${{ fromJson(steps.version.outputs.content).version }}"
-          body: |
-            # iOS 版本更新
-            ${{ fromJson(steps.version.outputs.content).version_desc }}
+          body: "# iOS版本\n${{ fromJson(steps.version.outputs.content).version_desc }}"
           prerelease: ${{ fromJson(steps.version.outputs.content).prerelease }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.TOKEN }}
           files: |
             simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
 
-      # 步骤 10: 输出最终状态
+      # 步骤 12: 完成提示
       - name: Finalizing build
-        run: echo "🍎 iOS build and release process completed with status ${{ job.status }}."
+        run: echo "🍎 iOS build completed with status ${{ job.status }}."
