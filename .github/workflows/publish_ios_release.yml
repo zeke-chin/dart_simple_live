@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-ios:
-    # 使用一个较新的、稳定的macOS版本
+    # 使用一个具体的 macOS 版本以保证环境稳定
     runs-on: macos-13
 
     permissions:
@@ -25,9 +25,9 @@ jobs:
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.2' # 你可以根据需要选择一个稳定的版本
+          xcode-version: '15.2'
 
-      # 步骤 3: 设置 Java 环境 (如果Android构建也在此，否则为iOS构建可选)
+      # 步骤 3: 设置 Java 环境
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -41,17 +41,21 @@ jobs:
           flutter-version: '3.22.x'
           cache: true
 
-      # 步骤 5: 更新 Flutter 的 packages
-      - name: Restore Flutter packages
+      # 步骤 5: 清理项目并获取 Flutter 依赖
+      # 这一步非常关键：
+      # 1. flutter clean 会清理旧的构建产物。
+      # 2. flutter pub get 会获取 Dart 依赖，并生成 iOS 构建所需的 Generated.xcconfig 等文件。
+      - name: Clean project and get Flutter packages
         run: |
           cd simple_live_app
+          flutter clean
           flutter pub get
 
-      # 步骤 6: 强制设置所有 Pods 的 iOS 部署目标
-      - name: Set iOS deployment target for all Pods
+      # 步骤 6: 准备并安装 iOS Pods 依赖
+      - name: Prepare and install iOS dependencies
         run: |
           cd simple_live_app/ios
-          # 在 Podfile 的末尾添加一个 post_install 钩子
+          # 在 Podfile 的末尾添加一个 post_install 钩子来统一设置所有 Pods 的部署目标
           echo "
           post_install do |installer|
             installer.pods_project.targets.each do |target|
@@ -61,23 +65,16 @@ jobs:
             end
           end
           " >> Podfile
-
-      # 步骤 7: 清理并安装 iOS 依赖
-      - name: Clean and install iOS dependencies
-        run: |
-          cd simple_live_app
-          flutter clean
-          cd ios
-          rm -rf Pods Podfile.lock
+          # 现在 Generated.xcconfig 文件已存在，可以安全地运行 pod install
           pod install --repo-update
 
-      # 步骤 8: 打包 iOS 应用 (IPA)
+      # 步骤 7: 打包 iOS 应用 (IPA)
       - name: Build IPA
         run: |
           cd simple_live_app
           flutter build ios --release --no-codesign
 
-      # 步骤 9: 创建未签名的 IPA 文件
+      # 步骤 8: 创建未签名的 IPA 文件
       - name: Create unsigned IPA
         run: |
           cd simple_live_app
@@ -86,14 +83,14 @@ jobs:
           cd build/ios/iphoneos/
           zip -r ios_no_sign.ipa Payload
 
-      # 步骤 10: 上传 IPA 至 Artifacts
+      # 步骤 9: 上传 IPA 至 Artifacts
       - name: Upload IPA to Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ios-unsigned-ipa
           path: simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
 
-      # 步骤 11: 读取版本信息
+      # 步骤 10: 读取版本信息
       - name: Read version information
         id: version
         uses: juliangruber/read-file-action@v1
@@ -105,10 +102,10 @@ jobs:
           echo "Version: ${{ fromJson(steps.version.outputs.content).version }}"
           echo "Version Description: ${{ fromJson(steps.version.outputs.content).version_desc }}"
 
-      # 步骤 12: (可选) 上传至 Release
+      # 步骤 11: (可选) 上传至 Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/') # 仅在推送 tag 时运行
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           name: "iOS ${{ fromJson(steps.version.outputs.content).version }}"
           body: "# iOS版本\n${{ fromJson(steps.version.outputs.content).version_desc }}"
@@ -117,6 +114,6 @@ jobs:
           files: |
             simple_live_app/build/ios/iphoneos/ios_no_sign.ipa
 
-      # 步骤 13: 完成提示
+      # 步骤 12: 完成提示
       - name: Finalizing build
         run: echo "🍎 iOS build completed with status ${{ job.status }}."
