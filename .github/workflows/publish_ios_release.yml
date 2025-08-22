@@ -35,6 +35,16 @@ jobs:
           cd simple_live_app
           flutter pub get
 
+      #设置iOS部署目标版本
+      - name: Set iOS deployment target
+        run: |
+          cd simple_live_app
+          # 修改Podfile中的iOS版本
+          sed -i '' 's/platform :ios, '\''13.0'\''/platform :ios, '\''12.0'\''/g' ios/Podfile
+          # 修改项目文件中的iOS部署目标
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11.0;/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/g' ios/Runner.xcodeproj/project.pbxproj
+
       #打包iOS
       - name: Build IPA
         run: |
