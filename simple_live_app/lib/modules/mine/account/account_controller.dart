@@ -1,10 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/routes/route_path.dart';
 import 'package:simple_live_app/services/bilibili_account_service.dart';
+import 'package:simple_live_app/services/douyin_account_service.dart';
+import 'package:simple_live_core/simple_live_core.dart';
 
 class AccountController extends GetxController {
   void bilibiliTap() async {
@@ -55,7 +58,7 @@ class AccountController extends GetxController {
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Get.back();
-              doCookieLogin();
+              doBiliBiliCookieLogin();
             },
           ),
         ],
@@ -63,7 +66,7 @@ class AccountController extends GetxController {
     );
   }
 
-  void doCookieLogin() async {
+  void doBiliBiliCookieLogin() async {
     var cookie = await Utils.showEditTextDialog(
       "",
       title: "请输入Cookie",
@@ -74,5 +77,78 @@ class AccountController extends GetxController {
     }
     BiliBiliAccountService.instance.setCookie(cookie);
     await BiliBiliAccountService.instance.loadUserInfo();
+  }
+
+  void douyinTap() async {
+    if (DouyinAccountService.instance.hasCookie.value) {
+      var result = await Utils.showAlertDialog("确定要清除抖音 Cookie 吗？", title: "清除 Cookie");
+      if (result) {
+        DouyinAccountService.instance.clearCookie();
+        SmartDialog.showToast("已清除 Cookie，将使用默认 Cookie");
+      }
+    } else {
+      doDouyinCookieConfig();
+    }
+  }
+
+  void doDouyinCookieConfig() {
+    var controller = TextEditingController(
+      text: DouyinAccountService.instance.cookie,
+    );
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text("配置抖音 Cookie"),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "默认已内置有效的 Cookie（仅包含 ttwid），可观看所有画质。\n如有需要可自定义配置。",
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: "请粘贴 Cookie（留空则使用默认 Cookie）",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () {
+                  controller.text = DouyinSite.kDefaultCookie;
+                },
+                icon: const Icon(Icons.restore),
+                label: const Text("恢复默认 ttwid"),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text("取消"),
+          ),
+          TextButton(
+            onPressed: () {
+              var cookie = controller.text.trim();
+              Get.back();
+              if (cookie.isEmpty) {
+                DouyinAccountService.instance.clearCookie();
+                SmartDialog.showToast("已清除自定义 Cookie，将使用默认 Cookie");
+              } else {
+                DouyinAccountService.instance.setCookie(cookie);
+                SmartDialog.showToast("Cookie 已保存");
+              }
+            },
+            child: const Text("确定"),
+          ),
+        ],
+      ),
+    );
   }
 }
