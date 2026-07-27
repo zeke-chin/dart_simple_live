@@ -1085,6 +1085,8 @@ ${error?.stackTrace}''');
     //返回前台
     if (state == AppLifecycleState.resumed) {
       Log.d("返回前台");
+      // canvas_danmaku 会在进入后台时暂停，但不会自动恢复。
+      danmakuController?.resume();
       isBackground = false;
     }
   }
