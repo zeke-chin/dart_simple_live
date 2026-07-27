@@ -48,8 +48,8 @@ class MinePage extends StatelessWidget {
                     height: 48,
                   ),
                   applicationName: "Simple Live",
-                  applicationVersion: "简简单单看直播",
-                  applicationLegalese: "Ver ${Utils.packageInfo.version}",
+                  applicationVersion: "Ver ${Utils.versionLabel}",
+                  applicationLegalese: "简简单单看直播",
                 ));
               },
             ),

@@ -17,9 +17,21 @@ typedef TextValidate = bool Function(String text);
 
 class Utils {
   static late PackageInfo packageInfo;
+  static const String gitCommit = String.fromEnvironment("GIT_COMMIT");
   static DateFormat dateFormat = DateFormat("MM-dd HH:mm");
   static DateFormat dateFormatWithYear = DateFormat("yyyy-MM-dd HH:mm");
   static DateFormat timeFormat = DateFormat("HH:mm:ss");
+
+  static String get versionLabel {
+    var version = "${packageInfo.version}+${packageInfo.buildNumber}";
+    if (gitCommit.isEmpty) {
+      return version;
+    }
+    var shortCommit = gitCommit.length > 7
+        ? gitCommit.substring(0, 7)
+        : gitCommit;
+    return "$version ($shortCommit)";
+  }
 
   /// 处理时间
   static String parseTime(DateTime? dt) {

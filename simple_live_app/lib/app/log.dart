@@ -137,8 +137,7 @@ class LogFileWriter {
     write("Platform: ${Platform.operatingSystem}");
     write("Version: ${Platform.operatingSystemVersion}");
     write("Local: ${Platform.localeName}");
-    write(
-        "App Version: ${Utils.packageInfo.version}+${Utils.packageInfo.buildNumber}");
+    write("App Version: ${Utils.versionLabel}");
     if (Platform.isAndroid) {
       write((await deviceInfo.androidInfo).data.toString());
     } else if (Platform.isIOS) {

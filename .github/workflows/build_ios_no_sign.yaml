@@ -36,7 +36,9 @@ jobs:
 
       - name: Build iOS
         working-directory: simple_live_app
-        run: flutter build ios --release --no-codesign
+        run: >-
+          flutter build ios --release --no-codesign
+          --dart-define=GIT_COMMIT=${{ github.sha }}
 
       - name: Create unsigned IPA
         working-directory: simple_live_app/build/ios/iphoneos
