@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:simple_live_core/simple_live_core.dart';
 import 'package:simple_live_core/src/common/convert_helper.dart';
+import 'package:simple_live_core/src/common/douyin_room_data_helper.dart';
 import 'package:simple_live_core/src/common/http_client.dart';
 import 'package:simple_live_core/src/scripts/douyin_sign.dart';
 
@@ -45,22 +46,23 @@ class DouyinSite implements LiveSite {
   };
 
   Future<Map<String, dynamic>> getRequestHeaders() async {
+    final requestHeaders = Map<String, dynamic>.from(headers);
     try {
       // 如果用户已设置 cookie，直接使用用户的 cookie
       if (cookie.isNotEmpty) {
-        headers["cookie"] = cookie;
-        return headers;
+        requestHeaders["cookie"] = cookie;
+        return requestHeaders;
       }
 
       // 使用默认的 ttwid cookie（只需要 ttwid 即可获取所有画质）
-      headers["cookie"] = kDefaultCookie;
-      return headers;
+      requestHeaders["cookie"] = kDefaultCookie;
+      return requestHeaders;
     } catch (e) {
       CoreLog.error(e);
-      if (!(headers["cookie"]?.toString().isNotEmpty ?? false)) {
-        headers["cookie"] = kDefaultCookie;
+      if (!(requestHeaders["cookie"]?.toString().isNotEmpty ?? false)) {
+        requestHeaders["cookie"] = kDefaultCookie;
       }
-      return headers;
+      return requestHeaders;
     }
   }
 
@@ -312,8 +314,11 @@ class DouyinSite implements LiveSite {
     try {
       var result = await _getRoomDetailByWebRidApi(webRid);
       return result;
-    } catch (e) {
-      CoreLog.error(e);
+    } catch (e, stackTrace) {
+      CoreLog.e(
+        '[Douyin] Room API failed for webRid=$webRid; falling back to HTML: $e',
+        stackTrace,
+      );
     }
     return await _getRoomDetailByWebRidHtml(webRid);
   }
@@ -373,8 +378,15 @@ class DouyinSite implements LiveSite {
   Future<LiveRoomDetail> _getRoomDetailByWebRidHtml(String webRid) async {
     var roomData = await _getRoomDataByHtml(webRid);
     var roomId = roomData["roomStore"]["roomInfo"]["room"]["id_str"].toString();
-    var userUniqueId = roomData["userStore"]["odin"]["user_unique_id"]
-        .toString();
+    final embeddedUserUniqueId = readDouyinUserUniqueId(roomData);
+    final userUniqueId =
+        embeddedUserUniqueId ?? generateRandomNumber(12).toString();
+    if (embeddedUserUniqueId == null) {
+      CoreLog.w(
+        '[Douyin] HTML room data has no userStore.odin.user_unique_id for '
+        'webRid=$webRid; using a generated danmaku user id',
+      );
+    }
 
     var room = roomData["roomStore"]["roomInfo"]["room"];
     var owner = room["owner"];

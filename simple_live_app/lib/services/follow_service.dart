@@ -154,7 +154,8 @@ class FollowService extends GetxService {
   /// 获取最优并发数
   /// 根据 CPU 核心数和用户设置自动计算
   int getOptimalConcurrency() {
-    var userSetting = AppSettingsController.instance.updateFollowThreadCount.value;
+    var userSetting =
+        AppSettingsController.instance.updateFollowThreadCount.value;
 
     // 如果用户设置为 0，则自动根据 CPU 核心数计算
     if (userSetting == 0) {
@@ -225,6 +226,16 @@ class FollowService extends GetxService {
   Future updateLiveStatus(FollowUser item) async {
     try {
       var site = Sites.allSites[item.siteId]!;
+      if (item.siteId == Constant.kDouyin) {
+        // DouyinSite.getLiveStatus internally loads the complete room detail.
+        // Reuse a single detail request here to avoid immediately requesting
+        // the same room twice during a concurrent follow-list refresh.
+        var detail = await site.liveSite.getRoomDetail(roomId: item.roomId);
+        item.liveStatus.value = detail.status ? 2 : 1;
+        item.liveStartTime = detail.status ? detail.showTime : null;
+        return;
+      }
+
       // 先只查状态
       var isLiving = await site.liveSite.getLiveStatus(roomId: item.roomId);
       item.liveStatus.value = isLiving ? 2 : 1;
