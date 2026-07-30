@@ -85,6 +85,23 @@ class AppSettingsController extends GetxController {
 
     // ignore: invalid_use_of_protected_member
     shieldList.value = LocalStorageService.instance.shieldBox.values.toSet();
+    autoShieldList.addAll(
+      LocalStorageService.instance.getValue<List<dynamic>>(
+        LocalStorageService.kAutoDanmuShieldList,
+        <dynamic>[],
+      ).whereType<String>(),
+    );
+    autoShieldIgnoreList.addAll(
+      LocalStorageService.instance.getValue<List<dynamic>>(
+        LocalStorageService.kAutoDanmuShieldIgnoreList,
+        <dynamic>[],
+      ).whereType<String>(),
+    );
+
+    // The dedicated list records the source of an automatically added word;
+    // the main shield list remains the single source used by message filtering.
+    shieldList.addAll(autoShieldList);
+    autoShieldIgnoreList.removeAll(shieldList);
 
     scaleMode.value = LocalStorageService.instance.getValue(
       LocalStorageService.kPlayerScaleMode,
@@ -381,19 +398,77 @@ class AppSettingsController extends GetxController {
   }
 
   RxSet<String> shieldList = <String>{}.obs;
+  RxSet<String> autoShieldList = <String>{}.obs;
+  RxSet<String> autoShieldIgnoreList = <String>{}.obs;
+
   void addShieldList(String e) {
-    shieldList.add(e);
-    LocalStorageService.instance.shieldBox.put(e, e);
+    final keyword = e.trim();
+    if (keyword.isEmpty) {
+      return;
+    }
+
+    shieldList.add(keyword);
+    LocalStorageService.instance.shieldBox.put(keyword, keyword);
+    if (autoShieldIgnoreList.remove(keyword)) {
+      _saveAutoShieldIgnoreList();
+    }
+  }
+
+  void addAutoShield(String e) {
+    final keyword = e.trim();
+    if (keyword.isEmpty) {
+      return;
+    }
+
+    addShieldList(keyword);
+    autoShieldList.add(keyword);
+    _saveAutoShieldList();
   }
 
   void removeShieldList(String e) {
     shieldList.remove(e);
     LocalStorageService.instance.shieldBox.delete(e);
+    if (autoShieldList.remove(e)) {
+      _saveAutoShieldList();
+    }
+  }
+
+  void ignoreAutoShield(String e) {
+    final keyword = e.trim();
+    if (keyword.isEmpty || shieldList.contains(keyword)) {
+      return;
+    }
+
+    autoShieldIgnoreList.add(keyword);
+    _saveAutoShieldIgnoreList();
+  }
+
+  void removeAutoShieldIgnore(String e) {
+    autoShieldIgnoreList.remove(e);
+    _saveAutoShieldIgnoreList();
+  }
+
+  void _saveAutoShieldList() {
+    LocalStorageService.instance.setValue(
+      LocalStorageService.kAutoDanmuShieldList,
+      autoShieldList.toList(),
+    );
+  }
+
+  void _saveAutoShieldIgnoreList() {
+    LocalStorageService.instance.setValue(
+      LocalStorageService.kAutoDanmuShieldIgnoreList,
+      autoShieldIgnoreList.toList(),
+    );
   }
 
   Future clearShieldList() async {
     shieldList.clear();
+    autoShieldList.clear();
     await LocalStorageService.instance.shieldBox.clear();
+    await LocalStorageService.instance.removeValue(
+      LocalStorageService.kAutoDanmuShieldList,
+    );
   }
 
   void setScaleMode(int value) {

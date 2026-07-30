@@ -21,4 +21,10 @@ class DanmuShieldController extends BaseController {
   void remove(String item) {
     settingsController.removeShieldList(item);
   }
+
+  @override
+  void onClose() {
+    textEditingController.dispose();
+    super.onClose();
+  }
 }

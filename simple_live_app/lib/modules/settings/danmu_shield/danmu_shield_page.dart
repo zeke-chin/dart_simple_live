@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/modules/settings/danmu_shield/danmu_shield_controller.dart';
+import 'package:simple_live_app/modules/settings/danmu_shield/danmu_shield_list_view.dart';
 
 class DanmuShieldPage extends GetView<DanmuShieldController> {
   const DanmuShieldPage({Key? key}) : super(key: key);
@@ -37,42 +38,8 @@ class DanmuShieldPage extends GetView<DanmuShieldController> {
             style: Get.textTheme.bodySmall,
           ),
           AppStyle.vGap12,
-          Obx(
-            () => Text(
-              "已添加${controller.settingsController.shieldList.length}个关键词（点击移除）",
-              style: Get.textTheme.titleSmall,
-            ),
-          ),
-          AppStyle.vGap12,
-          Obx(
-            () => Wrap(
-              runSpacing: 12,
-              spacing: 12,
-              children: controller.settingsController.shieldList
-                  .map(
-                    (item) => InkWell(
-                      borderRadius: AppStyle.radius24,
-                      onTap: () {
-                        controller.remove(item);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: AppStyle.radius24,
-                        ),
-                        padding: AppStyle.edgeInsetsH12.copyWith(
-                          top: 4,
-                          bottom: 4,
-                        ),
-                        child: Text(
-                          item,
-                          style: Get.textTheme.bodyMedium,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
+          DanmuShieldListView(
+            controller: controller.settingsController,
           ),
         ],
       ),

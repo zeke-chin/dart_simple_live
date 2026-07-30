@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -18,7 +19,10 @@ import 'package:simple_live_app/app/sites.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/models/db/follow_user.dart';
 import 'package:simple_live_app/models/db/history.dart';
+import 'package:simple_live_app/modules/live_room/danmu_repeat_detector.dart';
 import 'package:simple_live_app/modules/live_room/player/player_controller.dart';
+import 'package:simple_live_app/modules/live_room/widgets/danmu_auto_shield_prompt.dart';
+import 'package:simple_live_app/modules/settings/danmu_shield/danmu_shield_list_view.dart';
 import 'package:simple_live_app/modules/settings/danmu_settings_page.dart';
 import 'package:simple_live_app/services/db_service.dart';
 import 'package:simple_live_app/services/follow_service.dart';
@@ -62,6 +66,12 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
 
   /// 聊天信息
   RxList<LiveMessage> messages = RxList<LiveMessage>();
+
+  final DanmuRepeatDetector _danmuRepeatDetector = DanmuRepeatDetector();
+  final Queue<String> _autoShieldCandidates = Queue<String>();
+  String? _activeAutoShieldCandidate;
+  late final String _autoShieldDialogTag = 'live_room_auto_shield_$hashCode';
+  var _isClosing = false;
 
   /// 清晰度数据
   RxList<LivePlayQuality> qualites = RxList<LivePlayQuality>();
@@ -213,9 +223,11 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
       }
 
       // 关键词屏蔽检查
-      for (var keyword in AppSettingsController.instance.shieldList) {
+      final settings = AppSettingsController.instance;
+      for (var keyword in settings.shieldList) {
         Pattern? pattern;
-        if (Utils.isRegexFormat(keyword)) {
+        if (!settings.autoShieldList.contains(keyword) &&
+            Utils.isRegexFormat(keyword)) {
           String removedSlash = Utils.removeRegexFormat(keyword);
           try {
             pattern = RegExp(removedSlash);
@@ -229,6 +241,14 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
         if (pattern != null && msg.message.contains(pattern)) {
           Log.d("关键词：$keyword\n已屏蔽消息内容：${msg.message}");
           return;
+        }
+      }
+
+      final normalizedMessage = msg.message.trim();
+      if (!settings.autoShieldIgnoreList.contains(normalizedMessage)) {
+        final repeatedMessage = _danmuRepeatDetector.add(msg.message);
+        if (repeatedMessage != null) {
+          _enqueueAutoShieldCandidate(repeatedMessage);
         }
       }
 
@@ -257,6 +277,94 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
     } else if (msg.type == LiveMessageType.superChat) {
       superChats.add(msg.data);
     }
+  }
+
+  void _enqueueAutoShieldCandidate(String message) {
+    final settings = AppSettingsController.instance;
+    if (settings.shieldList.contains(message) ||
+        settings.autoShieldIgnoreList.contains(message) ||
+        _activeAutoShieldCandidate == message ||
+        _autoShieldCandidates.contains(message)) {
+      return;
+    }
+
+    _autoShieldCandidates.addLast(message);
+    _showNextAutoShieldCandidate();
+  }
+
+  void _showNextAutoShieldCandidate() {
+    if (_isClosing || _activeAutoShieldCandidate != null) {
+      return;
+    }
+
+    final settings = AppSettingsController.instance;
+    while (_autoShieldCandidates.isNotEmpty) {
+      final candidate = _autoShieldCandidates.removeFirst();
+      if (settings.shieldList.contains(candidate) ||
+          settings.autoShieldIgnoreList.contains(candidate)) {
+        continue;
+      }
+
+      _activeAutoShieldCandidate = candidate;
+      unawaited(
+        SmartDialog.show<void>(
+          tag: _autoShieldDialogTag,
+          alignment: Alignment.bottomRight,
+          maskColor: Colors.transparent,
+          clickMaskDismiss: false,
+          usePenetrate: true,
+          debounce: false,
+          bindPage: false,
+          onDismiss: () {
+            _activeAutoShieldCandidate = null;
+            if (!_isClosing) {
+              scheduleMicrotask(_showNextAutoShieldCandidate);
+            }
+          },
+          builder: (context) => DanmuAutoShieldPrompt(
+            message: candidate,
+            onAccept: () => _resolveAutoShieldCandidate(
+              candidate,
+              _AutoShieldDecision.accept,
+            ),
+            onReject: () => _resolveAutoShieldCandidate(
+              candidate,
+              _AutoShieldDecision.reject,
+            ),
+            onIgnorePermanently: () => _resolveAutoShieldCandidate(
+              candidate,
+              _AutoShieldDecision.ignorePermanently,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+  }
+
+  void _resolveAutoShieldCandidate(
+    String message,
+    _AutoShieldDecision decision,
+  ) {
+    if (_activeAutoShieldCandidate != message) {
+      return;
+    }
+
+    final settings = AppSettingsController.instance;
+    switch (decision) {
+      case _AutoShieldDecision.accept:
+        settings.addAutoShield(message);
+        SmartDialog.showToast('已自动加入屏蔽关键词：$message');
+        break;
+      case _AutoShieldDecision.reject:
+        break;
+      case _AutoShieldDecision.ignorePermanently:
+        settings.ignoreAutoShield(message);
+        SmartDialog.showToast('已设为永不自动加入：$message');
+        break;
+    }
+
+    unawaited(SmartDialog.dismiss(tag: _autoShieldDialogTag));
   }
 
   /// 添加一条系统消息
@@ -766,67 +874,35 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
       keywordController.text = "";
     }
 
-    Utils.showBottomSheet(
-      title: "关键词屏蔽",
-      child: ListView(
-        padding: AppStyle.edgeInsetsA12,
-        children: [
-          TextField(
-            controller: keywordController,
-            decoration: InputDecoration(
-              contentPadding: AppStyle.edgeInsetsH12,
-              border: const OutlineInputBorder(),
-              hintText: "请输入关键词",
-              suffixIcon: TextButton.icon(
-                onPressed: addKeyword,
-                icon: const Icon(Icons.add),
-                label: const Text("添加"),
+    unawaited(
+      Utils.showBottomSheet(
+        title: "关键词屏蔽",
+        child: ListView(
+          padding: AppStyle.edgeInsetsA12,
+          children: [
+            TextField(
+              controller: keywordController,
+              decoration: InputDecoration(
+                contentPadding: AppStyle.edgeInsetsH12,
+                border: const OutlineInputBorder(),
+                hintText: "请输入关键词",
+                suffixIcon: TextButton.icon(
+                  onPressed: addKeyword,
+                  icon: const Icon(Icons.add),
+                  label: const Text("添加"),
+                ),
               ),
+              onSubmitted: (e) {
+                addKeyword();
+              },
             ),
-            onSubmitted: (e) {
-              addKeyword();
-            },
-          ),
-          AppStyle.vGap12,
-          Obx(
-            () => Text(
-              "已添加${AppSettingsController.instance.shieldList.length}个关键词（点击移除）",
-              style: Get.textTheme.titleSmall,
+            AppStyle.vGap12,
+            DanmuShieldListView(
+              controller: AppSettingsController.instance,
             ),
-          ),
-          AppStyle.vGap12,
-          Obx(
-            () => Wrap(
-              runSpacing: 12,
-              spacing: 12,
-              children: AppSettingsController.instance.shieldList
-                  .map(
-                    (item) => InkWell(
-                      borderRadius: AppStyle.radius24,
-                      onTap: () {
-                        AppSettingsController.instance.removeShieldList(item);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: AppStyle.radius24,
-                        ),
-                        padding: AppStyle.edgeInsetsH12.copyWith(
-                          top: 4,
-                          bottom: 4,
-                        ),
-                        child: Text(
-                          item,
-                          style: Get.textTheme.bodyMedium,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
+      ).whenComplete(keywordController.dispose),
     );
   }
 
@@ -1043,6 +1119,12 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
       return;
     }
 
+    _autoShieldCandidates.clear();
+    _danmuRepeatDetector.clear();
+    if (_activeAutoShieldCandidate != null) {
+      unawaited(SmartDialog.dismiss(tag: _autoShieldDialogTag));
+    }
+
     rxSite.value = site;
     rxRoomId.value = roomId;
 
@@ -1124,6 +1206,12 @@ ${error?.stackTrace}''');
 
   @override
   void onClose() {
+    _isClosing = true;
+    _autoShieldCandidates.clear();
+    _danmuRepeatDetector.clear();
+    if (_activeAutoShieldCandidate != null) {
+      unawaited(SmartDialog.dismiss(tag: _autoShieldDialogTag));
+    }
     WidgetsBinding.instance.removeObserver(this);
     scrollController.removeListener(scrollListener);
     autoExitTimer?.cancel();
@@ -1133,6 +1221,12 @@ ${error?.stackTrace}''');
     _liveDurationTimer?.cancel(); // 页面关闭时取消定时器
     super.onClose();
   }
+}
+
+enum _AutoShieldDecision {
+  accept,
+  reject,
+  ignorePermanently,
 }
 
 class _FollowUserBottomSheet extends StatefulWidget {

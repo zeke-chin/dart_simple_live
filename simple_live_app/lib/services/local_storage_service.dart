@@ -59,6 +59,12 @@ class LocalStorageService extends GetxService {
   /// 弹幕开启
   static const String kDanmuEnable = "DanmuEnable";
 
+  /// 自动加入的弹幕屏蔽关键词
+  static const String kAutoDanmuShieldList = "AutoDanmuShieldList";
+
+  /// 永久忽略自动加入的弹幕
+  static const String kAutoDanmuShieldIgnoreList = "AutoDanmuShieldIgnoreList";
+
   /// 弹幕字重
   static const String kDanmuFontWeight = "DanmuFontWeight";
 
