@@ -15,8 +15,16 @@ class DanmuShieldListView extends StatelessWidget {
     return Obx(() {
       final autoItems = controller.autoShieldList.toList()..sort();
       final autoItemSet = autoItems.toSet();
-      final manualItems = controller.shieldList
+      final exactItems = controller.exactShieldList
           .where((item) => !autoItemSet.contains(item))
+          .toList()
+        ..sort();
+      final exactItemSet = controller.exactShieldList.toSet();
+      final manualItems = controller.shieldList
+          .where(
+            (item) =>
+                !autoItemSet.contains(item) && !exactItemSet.contains(item),
+          )
           .toList()
         ..sort();
       final ignoredItems = controller.autoShieldIgnoreList.toList()..sort();
@@ -28,6 +36,14 @@ class DanmuShieldListView extends StatelessWidget {
             title: '手动加入的',
             items: manualItems,
             emptyText: '暂无手动添加的关键词',
+            onRemove: controller.removeShieldList,
+          ),
+          const SizedBox(height: 20),
+          _DanmuShieldSection(
+            title: '全匹配',
+            items: exactItems,
+            emptyText: '暂无全匹配屏蔽',
+            description: '只屏蔽文字完全相同的弹幕。',
             onRemove: controller.removeShieldList,
           ),
           const SizedBox(height: 20),

@@ -20,8 +20,10 @@ import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/models/db/follow_user.dart';
 import 'package:simple_live_app/models/db/history.dart';
 import 'package:simple_live_app/modules/live_room/danmu_repeat_detector.dart';
+import 'package:simple_live_app/modules/live_room/danmu_shield_matcher.dart';
 import 'package:simple_live_app/modules/live_room/player/player_controller.dart';
 import 'package:simple_live_app/modules/live_room/widgets/danmu_auto_shield_prompt.dart';
+import 'package:simple_live_app/modules/live_room/widgets/danmu_block_dialog.dart';
 import 'package:simple_live_app/modules/settings/danmu_shield/danmu_shield_list_view.dart';
 import 'package:simple_live_app/modules/settings/danmu_settings_page.dart';
 import 'package:simple_live_app/services/db_service.dart';
@@ -224,24 +226,13 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
 
       // 关键词屏蔽检查
       final settings = AppSettingsController.instance;
-      for (var keyword in settings.shieldList) {
-        Pattern? pattern;
-        if (!settings.autoShieldList.contains(keyword) &&
-            Utils.isRegexFormat(keyword)) {
-          String removedSlash = Utils.removeRegexFormat(keyword);
-          try {
-            pattern = RegExp(removedSlash);
-          } catch (e) {
-            // should avoid this during add keyword
-            Log.d("关键词：$keyword 正则格式错误");
-          }
-        } else {
-          pattern = keyword;
-        }
-        if (pattern != null && msg.message.contains(pattern)) {
-          Log.d("关键词：$keyword\n已屏蔽消息内容：${msg.message}");
-          return;
-        }
+      if (const DanmuShieldMatcher().isBlocked(
+        msg.message,
+        keywords: settings.shieldList,
+        exactKeywords: settings.exactShieldList,
+      )) {
+        Log.d("已屏蔽消息内容：${msg.message}");
+        return;
       }
 
       final normalizedMessage = msg.message.trim();
@@ -858,6 +849,51 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+
+  void showDanmuBlockDialog(LiveMessage message) {
+    if (message.userName == "LiveSysMessage") {
+      return;
+    }
+
+    final text = message.message.trim();
+    if (text.isEmpty) {
+      return;
+    }
+
+    unawaited(
+      Get.dialog<void>(
+        DanmuBlockDialog(
+          userName: message.userName,
+          message: text,
+          onConfirm: (keyword, {required exact}) {
+            if (exact) {
+              _addExactShieldFromChat(keyword);
+            } else {
+              _addContainsShieldFromChat(keyword);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _addExactShieldFromChat(String keyword) {
+    AppSettingsController.instance.addExactShield(keyword);
+    messages.removeWhere(
+      (item) =>
+          item.userName != "LiveSysMessage" && item.message.trim() == keyword,
+    );
+    SmartDialog.showToast("已全匹配屏蔽：$keyword");
+  }
+
+  void _addContainsShieldFromChat(String keyword) {
+    AppSettingsController.instance.addShieldList(keyword);
+    messages.removeWhere(
+      (item) =>
+          item.userName != "LiveSysMessage" && item.message.contains(keyword),
+    );
+    SmartDialog.showToast("已包含屏蔽：$keyword");
   }
 
   void showDanmuShield() {

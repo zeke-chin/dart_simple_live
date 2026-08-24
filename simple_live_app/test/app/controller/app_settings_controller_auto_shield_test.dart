@@ -36,6 +36,7 @@ void main() {
 
     expect(controller.shieldList, contains('自动屏蔽'));
     expect(controller.autoShieldList, contains('自动屏蔽'));
+    expect(controller.exactShieldList, contains('自动屏蔽'));
     expect(controller.autoShieldIgnoreList, contains('永不加入'));
     expect(storage.shieldBox.get('自动屏蔽'), '自动屏蔽');
 
@@ -44,7 +45,26 @@ void main() {
 
     expect(reloaded.shieldList, contains('自动屏蔽'));
     expect(reloaded.autoShieldList, contains('自动屏蔽'));
+    expect(reloaded.exactShieldList, contains('自动屏蔽'));
     expect(reloaded.autoShieldIgnoreList, contains('永不加入'));
+  });
+
+  test('manual exact shield persists separately from contains keywords', () async {
+    controller.addExactShield(' 全匹配弹幕 ');
+    controller.addShieldList('包含关键词');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.exactShieldList, contains('全匹配弹幕'));
+    expect(controller.shieldList, contains('全匹配弹幕'));
+    expect(controller.shieldList, contains('包含关键词'));
+    expect(controller.autoShieldList, isNot(contains('全匹配弹幕')));
+
+    controller.removeShieldList('全匹配弹幕');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.exactShieldList, isNot(contains('全匹配弹幕')));
+    expect(controller.shieldList, isNot(contains('全匹配弹幕')));
+    expect(controller.shieldList, contains('包含关键词'));
   });
 
   test('manual changes keep automatic categories consistent', () async {
