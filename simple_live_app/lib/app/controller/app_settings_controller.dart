@@ -85,31 +85,34 @@ class AppSettingsController extends GetxController {
 
     // ignore: invalid_use_of_protected_member
     shieldList.value = LocalStorageService.instance.shieldBox.values.toSet();
-    autoShieldList.addAll(
-      LocalStorageService.instance.getValue<List<dynamic>>(
-        LocalStorageService.kAutoDanmuShieldList,
-        <dynamic>[],
-      ).whereType<String>(),
-    );
     exactShieldList.addAll(
       LocalStorageService.instance.getValue<List<dynamic>>(
         LocalStorageService.kExactDanmuShieldList,
         <dynamic>[],
       ).whereType<String>(),
     );
-    autoShieldIgnoreList.addAll(
-      LocalStorageService.instance.getValue<List<dynamic>>(
-        LocalStorageService.kAutoDanmuShieldIgnoreList,
-        <dynamic>[],
-      ).whereType<String>(),
-    );
 
-    // Auto-added items are exact matches. Keep them in the main list so
-    // existing sync still sends the text, then skip them during contains.
-    exactShieldList.addAll(autoShieldList);
-    shieldList.addAll(autoShieldList);
-    autoShieldIgnoreList.removeAll(shieldList);
-    autoShieldIgnoreList.removeAll(exactShieldList);
+    final legacyAutoShield = LocalStorageService.instance
+        .getValue<List<dynamic>>(
+          LocalStorageService.kAutoDanmuShieldList,
+          <dynamic>[],
+        )
+        .whereType<String>()
+        .toList();
+    if (legacyAutoShield.isNotEmpty) {
+      exactShieldList.addAll(legacyAutoShield);
+      shieldList.addAll(legacyAutoShield);
+      for (final keyword in legacyAutoShield) {
+        LocalStorageService.instance.shieldBox.put(keyword, keyword);
+      }
+      _saveExactShieldList();
+    }
+    LocalStorageService.instance.removeValue(
+      LocalStorageService.kAutoDanmuShieldList,
+    );
+    LocalStorageService.instance.removeValue(
+      LocalStorageService.kAutoDanmuShieldIgnoreList,
+    );
 
     scaleMode.value = LocalStorageService.instance.getValue(
       LocalStorageService.kPlayerScaleMode,
@@ -406,9 +409,7 @@ class AppSettingsController extends GetxController {
   }
 
   RxSet<String> shieldList = <String>{}.obs;
-  RxSet<String> autoShieldList = <String>{}.obs;
   RxSet<String> exactShieldList = <String>{}.obs;
-  RxSet<String> autoShieldIgnoreList = <String>{}.obs;
 
   void addShieldList(String e) {
     final keyword = e.trim();
@@ -418,9 +419,6 @@ class AppSettingsController extends GetxController {
 
     shieldList.add(keyword);
     LocalStorageService.instance.shieldBox.put(keyword, keyword);
-    if (autoShieldIgnoreList.remove(keyword)) {
-      _saveAutoShieldIgnoreList();
-    }
   }
 
   void addExactShield(String e) {
@@ -434,50 +432,12 @@ class AppSettingsController extends GetxController {
     _saveExactShieldList();
   }
 
-  void addAutoShield(String e) {
-    final keyword = e.trim();
-    if (keyword.isEmpty) {
-      return;
-    }
-
-    addExactShield(keyword);
-    autoShieldList.add(keyword);
-    _saveAutoShieldList();
-  }
-
   void removeShieldList(String e) {
     shieldList.remove(e);
     LocalStorageService.instance.shieldBox.delete(e);
-    if (autoShieldList.remove(e)) {
-      _saveAutoShieldList();
-    }
     if (exactShieldList.remove(e)) {
       _saveExactShieldList();
     }
-  }
-
-  void ignoreAutoShield(String e) {
-    final keyword = e.trim();
-    if (keyword.isEmpty ||
-        shieldList.contains(keyword) ||
-        exactShieldList.contains(keyword)) {
-      return;
-    }
-
-    autoShieldIgnoreList.add(keyword);
-    _saveAutoShieldIgnoreList();
-  }
-
-  void removeAutoShieldIgnore(String e) {
-    autoShieldIgnoreList.remove(e);
-    _saveAutoShieldIgnoreList();
-  }
-
-  void _saveAutoShieldList() {
-    LocalStorageService.instance.setValue(
-      LocalStorageService.kAutoDanmuShieldList,
-      autoShieldList.toList(),
-    );
   }
 
   void _saveExactShieldList() {
@@ -487,23 +447,18 @@ class AppSettingsController extends GetxController {
     );
   }
 
-  void _saveAutoShieldIgnoreList() {
-    LocalStorageService.instance.setValue(
-      LocalStorageService.kAutoDanmuShieldIgnoreList,
-      autoShieldIgnoreList.toList(),
-    );
-  }
-
   Future clearShieldList() async {
     shieldList.clear();
-    autoShieldList.clear();
     exactShieldList.clear();
     await LocalStorageService.instance.shieldBox.clear();
+    await LocalStorageService.instance.removeValue(
+      LocalStorageService.kExactDanmuShieldList,
+    );
     await LocalStorageService.instance.removeValue(
       LocalStorageService.kAutoDanmuShieldList,
     );
     await LocalStorageService.instance.removeValue(
-      LocalStorageService.kExactDanmuShieldList,
+      LocalStorageService.kAutoDanmuShieldIgnoreList,
     );
   }
 

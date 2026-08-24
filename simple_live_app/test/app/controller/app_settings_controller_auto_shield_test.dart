@@ -14,7 +14,7 @@ void main() {
   setUp(() async {
     Get.testMode = true;
     storageDirectory = await Directory.systemTemp.createTemp(
-      'simple_live_auto_shield_test_',
+      'simple_live_shield_test_',
     );
     Hive.init(storageDirectory.path);
     storage = Get.put(LocalStorageService());
@@ -28,28 +28,8 @@ void main() {
     await storageDirectory.delete(recursive: true);
   });
 
-  test('persists automatically added and permanently ignored danmaku',
+  test('manual exact shield persists separately from contains keywords',
       () async {
-    controller.addAutoShield(' 自动屏蔽 ');
-    controller.ignoreAutoShield('永不加入');
-    await Future<void>.delayed(Duration.zero);
-
-    expect(controller.shieldList, contains('自动屏蔽'));
-    expect(controller.autoShieldList, contains('自动屏蔽'));
-    expect(controller.exactShieldList, contains('自动屏蔽'));
-    expect(controller.autoShieldIgnoreList, contains('永不加入'));
-    expect(storage.shieldBox.get('自动屏蔽'), '自动屏蔽');
-
-    await Get.delete<AppSettingsController>();
-    final reloaded = Get.put(AppSettingsController());
-
-    expect(reloaded.shieldList, contains('自动屏蔽'));
-    expect(reloaded.autoShieldList, contains('自动屏蔽'));
-    expect(reloaded.exactShieldList, contains('自动屏蔽'));
-    expect(reloaded.autoShieldIgnoreList, contains('永不加入'));
-  });
-
-  test('manual exact shield persists separately from contains keywords', () async {
     controller.addExactShield(' 全匹配弹幕 ');
     controller.addShieldList('包含关键词');
     await Future<void>.delayed(Duration.zero);
@@ -57,7 +37,6 @@ void main() {
     expect(controller.exactShieldList, contains('全匹配弹幕'));
     expect(controller.shieldList, contains('全匹配弹幕'));
     expect(controller.shieldList, contains('包含关键词'));
-    expect(controller.autoShieldList, isNot(contains('全匹配弹幕')));
 
     controller.removeShieldList('全匹配弹幕');
     await Future<void>.delayed(Duration.zero);
@@ -67,19 +46,35 @@ void main() {
     expect(controller.shieldList, contains('包含关键词'));
   });
 
-  test('manual changes keep automatic categories consistent', () async {
-    controller.ignoreAutoShield('稍后手动屏蔽');
-    controller.addShieldList('稍后手动屏蔽');
-    controller.addAutoShield('自动屏蔽');
+  test('migrates leftover automatic shield words into exact matches', () async {
+    await storage.setValue(
+      LocalStorageService.kAutoDanmuShieldList,
+      <String>['自动屏蔽'],
+    );
+    await storage.setValue(
+      LocalStorageService.kAutoDanmuShieldIgnoreList,
+      <String>['永不加入'],
+    );
+
+    await Get.delete<AppSettingsController>();
+    final reloaded = Get.put(AppSettingsController());
     await Future<void>.delayed(Duration.zero);
 
-    expect(controller.autoShieldIgnoreList, isNot(contains('稍后手动屏蔽')));
-
-    controller.removeShieldList('自动屏蔽');
-    await Future<void>.delayed(Duration.zero);
-
-    expect(controller.shieldList, isNot(contains('自动屏蔽')));
-    expect(controller.autoShieldList, isNot(contains('自动屏蔽')));
-    expect(storage.shieldBox.containsKey('自动屏蔽'), isFalse);
+    expect(reloaded.exactShieldList, contains('自动屏蔽'));
+    expect(reloaded.shieldList, contains('自动屏蔽'));
+    expect(
+      storage.getValue<List<dynamic>>(
+        LocalStorageService.kAutoDanmuShieldList,
+        <dynamic>[],
+      ),
+      isEmpty,
+    );
+    expect(
+      storage.getValue<List<dynamic>>(
+        LocalStorageService.kAutoDanmuShieldIgnoreList,
+        <dynamic>[],
+      ),
+      isEmpty,
+    );
   });
 }
