@@ -20,7 +20,7 @@ dependencies:
   logger: ^2.6.2 #日志
   intl: ^0.20.2 #国际化
   qr_flutter: ^4.1.0 #二维码生成
-  dynamic_color: ^1.8.1 #动态颜色
+  dynamic_color: 1.8.1 # 1.9.0 的 Android Gradle 与当前 AGP/Kotlin 不兼容
   path: any
   collection: any
   characters: any
