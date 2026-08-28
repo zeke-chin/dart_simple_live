@@ -784,11 +784,19 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
 
   void _addContainsShieldFromChat(String keyword) {
     AppSettingsController.instance.addShieldList(keyword);
+    const matcher = DanmuShieldMatcher();
     messages.removeWhere(
       (item) =>
-          item.userName != "LiveSysMessage" && item.message.contains(keyword),
+          item.userName != "LiveSysMessage" &&
+          matcher.isBlocked(
+            item.message,
+            keywords: [keyword],
+            exactKeywords: const {},
+          ),
     );
-    SmartDialog.showToast("已包含屏蔽：$keyword");
+    final toast =
+        Utils.isRegexFormat(keyword) ? "已正则屏蔽：$keyword" : "已包含屏蔽：$keyword";
+    SmartDialog.showToast(toast);
   }
 
   void showDanmuShield() {
@@ -896,7 +904,7 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
         var item = historyList[i];
         var itemSite = Sites.allSites[item.siteId];
         if (itemSite == null) return const SizedBox.shrink();
-        
+
         return ListTile(
           contentPadding: AppStyle.edgeInsetsL16.copyWith(right: 4),
           leading: NetImage(
@@ -927,15 +935,15 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
               ),
             ],
           ),
-          trailing: (rxSite.value.id == item.siteId &&
-                  rxRoomId.value == item.roomId)
-              ? const SizedBox(
-                  width: 64,
-                  child: Center(
-                    child: Icon(Icons.play_arrow),
-                  ),
-                )
-              : null,
+          trailing:
+              (rxSite.value.id == item.siteId && rxRoomId.value == item.roomId)
+                  ? const SizedBox(
+                      width: 64,
+                      child: Center(
+                        child: Icon(Icons.play_arrow),
+                      ),
+                    )
+                  : null,
           onTap: () {
             Get.back();
             resetRoom(

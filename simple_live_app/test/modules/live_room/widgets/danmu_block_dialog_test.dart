@@ -33,7 +33,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('confirms the full message as an exact match', (tester) async {
+  testWidgets('select all confirms the full message as an exact match',
+      (tester) async {
     String? keyword;
     bool? isExact;
 
@@ -46,36 +47,30 @@ void main() {
       },
     );
 
+    expect(find.byType(RangeSlider), findsNothing);
+    expect(find.text('请选择要屏蔽的文字'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '屏蔽'))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.text('全选'));
+    await tester.pump();
+
     expect(find.text('全匹配：只屏蔽完全相同的弹幕'), findsOneWidget);
+
+    await tester.tap(find.text('清空'));
+    await tester.pump();
+    expect(find.text('请选择要屏蔽的文字'), findsOneWidget);
+
+    await tester.tap(find.text('全选'));
+    await tester.pump();
     await tester.tap(find.text('屏蔽'));
     await tester.pumpAndSettle();
 
     expect(keyword, '关注主播谢谢');
     expect(isExact, isTrue);
-  });
-
-  testWidgets('sliding the range switches to contains matching', (tester) async {
-    String? keyword;
-    bool? isExact;
-
-    await openDialog(
-      tester,
-      message: '加微信abc',
-      onConfirm: (value, {required bool exact}) {
-        keyword = value;
-        isExact = exact;
-      },
-    );
-
-    final slider = tester.widget<RangeSlider>(find.byType(RangeSlider));
-    slider.onChanged!(const RangeValues(0, 3));
-    await tester.pump();
-
-    expect(find.textContaining('包含：屏蔽所有含「加微信」的弹幕'), findsOneWidget);
-    await tester.tap(find.text('屏蔽'));
-    await tester.pumpAndSettle();
-
-    expect(keyword, '加微信');
-    expect(isExact, isFalse);
   });
 }
