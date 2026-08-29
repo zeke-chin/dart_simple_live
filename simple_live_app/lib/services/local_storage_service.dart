@@ -83,6 +83,9 @@ class LocalStorageService extends GetxService {
   /// 聊天区-气泡样式
   static const String kChatBubbleStyle = "ChatBubbleStyle";
 
+  /// 聊天区是否显示已屏蔽弹幕
+  static const String kChatShowShieldedDanmu = "ChatShowShieldedDanmu";
+
   /// 播放清晰度，0=低，1=中，2=高
   static const String kQualityLevel = "QualityLevel";
 

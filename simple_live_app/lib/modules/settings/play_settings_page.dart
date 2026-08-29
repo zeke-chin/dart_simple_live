@@ -244,6 +244,16 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
                     },
                   ),
                 ),
+                AppStyle.divider,
+                Obx(
+                  () => SettingsSwitch(
+                    title: "显示已屏蔽弹幕",
+                    value: controller.chatShowShieldedDanmu.value,
+                    onChanged: (e) {
+                      controller.setChatShowShieldedDanmu(e);
+                    },
+                  ),
+                ),
               ],
             ),
           ),

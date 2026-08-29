@@ -7,10 +7,24 @@ class DanmuShieldMatcher {
     required Iterable<String> keywords,
     required Set<String> exactKeywords,
   }) {
+    return matchedKeywords(
+      message,
+      keywords: keywords,
+      exactKeywords: exactKeywords,
+    ).isNotEmpty;
+  }
+
+  List<String> matchedKeywords(
+    String message, {
+    required Iterable<String> keywords,
+    required Set<String> exactKeywords,
+  }) {
+    final matches = <String>[];
     final trimmed = message.trim();
-    if (exactKeywords.contains(message) ||
-        (trimmed.isNotEmpty && exactKeywords.contains(trimmed))) {
-      return true;
+    if (exactKeywords.contains(message)) {
+      matches.add(message);
+    } else if (trimmed.isNotEmpty && exactKeywords.contains(trimmed)) {
+      matches.add(trimmed);
     }
 
     for (final keyword in keywords) {
@@ -21,17 +35,17 @@ class DanmuShieldMatcher {
       if (_isRegexFormat(keyword)) {
         try {
           if (message.contains(RegExp(_removeRegexFormat(keyword)))) {
-            return true;
+            matches.add(keyword);
           }
         } catch (_) {
           continue;
         }
       } else if (message.contains(keyword)) {
-        return true;
+        matches.add(keyword);
       }
     }
 
-    return false;
+    return matches;
   }
 
   static bool _isRegexFormat(String keyword) {

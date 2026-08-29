@@ -79,4 +79,23 @@ void main() {
       isFalse,
     );
   });
+
+  test('lists every keyword that matches a message', () {
+    expect(
+      matcher.matchedKeywords(
+        '加微信abc123',
+        keywords: const ['加微信', r'/\d+/', '普通'],
+        exactKeywords: const {},
+      ),
+      ['加微信', r'/\d+/'],
+    );
+    expect(
+      matcher.matchedKeywords(
+        '666',
+        keywords: const ['666'],
+        exactKeywords: {'666'},
+      ),
+      ['666'],
+    );
+  });
 }

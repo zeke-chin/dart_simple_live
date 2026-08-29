@@ -468,42 +468,47 @@ class LiveRoomPage extends GetView<LiveRoomController> {
               child: TabBarView(
                 children: [
                   Obx(
-                    () => Stack(
-                      children: [
-                        ListView.separated(
-                          controller: controller.scrollController,
-                          separatorBuilder: (_, i) => Obx(
-                            () => SizedBox(
-                              // *2与原来的EdgeInsets.symmetric(vertical: )做兼容
-                              height: AppSettingsController
-                                      .instance.chatTextGap.value *
-                                  2,
+                    () {
+                      final visibleMessages = controller.visibleChatMessages;
+                      return Stack(
+                        children: [
+                          ListView.separated(
+                            controller: controller.scrollController,
+                            separatorBuilder: (_, i) => Obx(
+                              () => SizedBox(
+                                // *2与原来的EdgeInsets.symmetric(vertical: )做兼容
+                                height: AppSettingsController
+                                        .instance.chatTextGap.value *
+                                    2,
+                              ),
+                            ),
+                            padding: AppStyle.edgeInsetsA12,
+                            itemCount: visibleMessages.length,
+                            itemBuilder: (context, i) {
+                              return buildMessageItem(
+                                context,
+                                visibleMessages[i],
+                              );
+                            },
+                          ),
+                          Visibility(
+                            visible: controller.disableAutoScroll.value,
+                            child: Positioned(
+                              right: 12,
+                              bottom: 12,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  controller.disableAutoScroll.value = false;
+                                  controller.chatScrollToBottom();
+                                },
+                                icon: const Icon(Icons.expand_more),
+                                label: const Text("最新"),
+                              ),
                             ),
                           ),
-                          padding: AppStyle.edgeInsetsA12,
-                          itemCount: controller.messages.length,
-                          itemBuilder: (_, i) {
-                            var item = controller.messages[i];
-                            return buildMessageItem(item);
-                          },
-                        ),
-                        Visibility(
-                          visible: controller.disableAutoScroll.value,
-                          child: Positioned(
-                            right: 12,
-                            bottom: 12,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                controller.disableAutoScroll.value = false;
-                                controller.chatScrollToBottom();
-                              },
-                              icon: const Icon(Icons.expand_more),
-                              label: const Text("最新"),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      );
+                    },
                   ),
                   if (controller.site.id == Constant.kBiliBili)
                     buildSuperChats(),
@@ -518,7 +523,7 @@ class LiveRoomPage extends GetView<LiveRoomController> {
     );
   }
 
-  Widget buildMessageItem(LiveMessage message) {
+  Widget buildMessageItem(BuildContext context, LiveMessage message) {
     if (message.userName == "LiveSysMessage") {
       return Obx(
         () => Text(
@@ -538,68 +543,62 @@ class LiveRoomPage extends GetView<LiveRoomController> {
         child: InkWell(
           onTap: () => controller.showDanmuBlockDialog(message),
           child: Obx(
-            () => AppSettingsController.instance.chatBubbleStyle.value
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Flexible(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey.withAlpha(25),
-                            //borderRadius: AppStyle.radius8,
-                            borderRadius: const BorderRadius.only(
-                              topRight: Radius.circular(12),
-                              bottomLeft: Radius.circular(12),
-                              bottomRight: Radius.circular(12),
-                            ),
-                          ),
-                          padding: AppStyle.edgeInsetsA4
-                              .copyWith(left: 12, right: 12),
-                          child: Text.rich(
-                            TextSpan(
-                              text: "${message.userName}：",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: AppSettingsController
-                                    .instance.chatTextSize.value,
-                              ),
-                              children: [
-                                TextSpan(
-                                  text: message.message,
-                                  style: TextStyle(
-                                    color: Get.isDarkMode
-                                        ? Colors.white
-                                        : AppColors.black333,
-                                  ),
-                                )
-                              ],
-                            ),
-                          ),
+            () {
+              final settings = AppSettingsController.instance;
+              final blocked = controller.isChatMessageBlocked(message);
+              final fontSize = settings.chatTextSize.value;
+              final blockedColor =
+                  Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFFFA726)
+                      : const Color(0xFFEF6C00);
+              final nameColor = blocked ? blockedColor : Colors.grey;
+              final messageColor = blocked
+                  ? blockedColor
+                  : (Get.isDarkMode ? Colors.white : AppColors.black333);
+              final content = Text.rich(
+                TextSpan(
+                  text: "${message.userName}：",
+                  style: TextStyle(
+                    color: nameColor,
+                    fontSize: fontSize,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: message.message,
+                      style: TextStyle(color: messageColor),
+                    ),
+                  ],
+                ),
+              );
+
+              if (!settings.chatBubbleStyle.value) {
+                return content;
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Flexible(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: blocked
+                            ? blockedColor.withValues(alpha: 0.12)
+                            : Colors.blueGrey.withAlpha(25),
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(12),
+                          bottomLeft: Radius.circular(12),
+                          bottomRight: Radius.circular(12),
                         ),
                       ),
-                    ],
-                  )
-                : Text.rich(
-                    TextSpan(
-                      text: "${message.userName}：",
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: AppSettingsController
-                            .instance.chatTextSize.value,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: message.message,
-                          style: TextStyle(
-                            color: Get.isDarkMode
-                                ? Colors.white
-                                : AppColors.black333,
-                          ),
-                        )
-                      ],
+                      padding:
+                          AppStyle.edgeInsetsA4.copyWith(left: 12, right: 12),
+                      child: content,
                     ),
                   ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -685,6 +684,17 @@ class LiveRoomPage extends GetView<LiveRoomController> {
                   value: AppSettingsController.instance.chatBubbleStyle.value,
                   onChanged: (e) {
                     AppSettingsController.instance.setChatBubbleStyle(e);
+                  },
+                ),
+              ),
+              AppStyle.divider,
+              Obx(
+                () => SettingsSwitch(
+                  title: "显示已屏蔽弹幕",
+                  value: AppSettingsController
+                      .instance.chatShowShieldedDanmu.value,
+                  onChanged: (e) {
+                    AppSettingsController.instance.setChatShowShieldedDanmu(e);
                   },
                 ),
               ),

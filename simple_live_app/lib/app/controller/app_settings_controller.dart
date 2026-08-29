@@ -57,6 +57,11 @@ class AppSettingsController extends GetxController {
       false,
     );
 
+    chatShowShieldedDanmu.value = LocalStorageService.instance.getValue(
+      LocalStorageService.kChatShowShieldedDanmu,
+      true,
+    );
+
     qualityLevel.value = LocalStorageService.instance
         .getValue(LocalStorageService.kQualityLevel, 1);
     qualityLevelCellular.value = LocalStorageService.instance
@@ -179,7 +184,7 @@ class AppSettingsController extends GetxController {
         .getValue(LocalStorageService.kUpdateFollowDuration, 10);
 
     updateFollowThreadCount.value = LocalStorageService.instance
-        .getValue(LocalStorageService.kUpdateFollowThreadCount, 0);  // 默认 0 = 自动
+        .getValue(LocalStorageService.kUpdateFollowThreadCount, 0); // 默认 0 = 自动
 
     initSiteSort();
     initHomeSort();
@@ -292,6 +297,13 @@ class AppSettingsController extends GetxController {
     chatBubbleStyle.value = e;
     LocalStorageService.instance
         .setValue(LocalStorageService.kChatBubbleStyle, e);
+  }
+
+  var chatShowShieldedDanmu = true.obs;
+  void setChatShowShieldedDanmu(bool e) {
+    chatShowShieldedDanmu.value = e;
+    LocalStorageService.instance
+        .setValue(LocalStorageService.kChatShowShieldedDanmu, e);
   }
 
   var danmuSize = 16.0.obs;

@@ -190,6 +190,26 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
     loadData();
   }
 
+  bool isChatMessageBlocked(LiveMessage message) {
+    if (message.userName == "LiveSysMessage") {
+      return false;
+    }
+    final settings = AppSettingsController.instance;
+    return const DanmuShieldMatcher().isBlocked(
+      message.message,
+      keywords: settings.shieldList,
+      exactKeywords: settings.exactShieldList,
+    );
+  }
+
+  List<LiveMessage> get visibleChatMessages {
+    final settings = AppSettingsController.instance;
+    if (settings.chatShowShieldedDanmu.value) {
+      return messages;
+    }
+    return messages.where((msg) => !isChatMessageBlocked(msg)).toList();
+  }
+
   /// 聊天栏始终滚动到底部
   void chatScrollToBottom() {
     if (scrollController.hasClients) {
@@ -215,15 +235,10 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
         messages.removeAt(0);
       }
 
-      // 关键词屏蔽检查
-      final settings = AppSettingsController.instance;
-      if (const DanmuShieldMatcher().isBlocked(
-        msg.message,
-        keywords: settings.shieldList,
-        exactKeywords: settings.exactShieldList,
-      )) {
+      // 关键词屏蔽检查：飘屏弹幕不显示；聊天区由设置决定是否展示
+      final blocked = isChatMessageBlocked(msg);
+      if (blocked) {
         Log.d("已屏蔽消息内容：${msg.message}");
-        return;
       }
 
       messages.add(msg);
@@ -231,7 +246,7 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => chatScrollToBottom(),
       );
-      if (!liveStatus.value || isBackground) {
+      if (blocked || !liveStatus.value || isBackground) {
         return;
       }
 
@@ -756,6 +771,17 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
       return;
     }
 
+    final settings = AppSettingsController.instance;
+    final matches = const DanmuShieldMatcher().matchedKeywords(
+      message.message,
+      keywords: settings.shieldList,
+      exactKeywords: settings.exactShieldList,
+    );
+    if (matches.isNotEmpty) {
+      unawaited(_showDanmuUnblockDialog(matches));
+      return;
+    }
+
     unawaited(
       Get.dialog<void>(
         DanmuBlockDialog(
@@ -773,27 +799,35 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _showDanmuUnblockDialog(List<String> keywords) async {
+    final preview = keywords.join('、');
+    final confirmed = await Utils.showAlertDialog(
+      keywords.length == 1
+          ? '将移除屏蔽词「$preview」，之后匹配的弹幕会重新出现在弹幕层。'
+          : '将移除这些屏蔽词：\n$preview\n之后匹配的弹幕会重新出现在弹幕层。',
+      title: '取消屏蔽',
+      confirm: '取消屏蔽',
+      cancel: '关闭',
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    for (final keyword in keywords) {
+      AppSettingsController.instance.removeShieldList(keyword);
+    }
+    SmartDialog.showToast(
+      keywords.length == 1 ? '已取消屏蔽：$preview' : '已取消屏蔽',
+    );
+  }
+
   void _addExactShieldFromChat(String keyword) {
     AppSettingsController.instance.addExactShield(keyword);
-    messages.removeWhere(
-      (item) =>
-          item.userName != "LiveSysMessage" && item.message.trim() == keyword,
-    );
     SmartDialog.showToast("已全匹配屏蔽：$keyword");
   }
 
   void _addContainsShieldFromChat(String keyword) {
     AppSettingsController.instance.addShieldList(keyword);
-    const matcher = DanmuShieldMatcher();
-    messages.removeWhere(
-      (item) =>
-          item.userName != "LiveSysMessage" &&
-          matcher.isBlocked(
-            item.message,
-            keywords: [keyword],
-            exactKeywords: const {},
-          ),
-    );
     final toast =
         Utils.isRegexFormat(keyword) ? "已正则屏蔽：$keyword" : "已包含屏蔽：$keyword";
     SmartDialog.showToast(toast);
