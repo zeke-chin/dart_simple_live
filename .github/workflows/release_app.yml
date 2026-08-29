@@ -400,14 +400,27 @@ jobs:
           ls -lh dist
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ needs.resolve.outputs.tag }}
-          name: Simple Live App ${{ needs.resolve.outputs.version_name }}
-          target_commitish: ${{ needs.resolve.outputs.sha }}
-          generate_release_notes: false
-          prerelease: ${{ needs.resolve.outputs.prerelease }}
-          body_path: release_body.md
-          files: dist/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          TITLE: Simple Live App ${{ needs.resolve.outputs.version_name }}
+          SHA: ${{ needs.resolve.outputs.sha }}
+          PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "${PRERELEASE}" = "true" ]; then
+            extra+=(--prerelease)
+          fi
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/* --clobber
+            gh release edit "${TAG}" --title "${TITLE}" --notes-file release_body.md "${extra[@]}"
+          else
+            gh release create "${TAG}" dist/* \
+              --title "${TITLE}" \
+              --notes-file release_body.md \
+              --target "${SHA}" \
+              "${extra[@]}"
+          fi
+          gh release view "${TAG}"
