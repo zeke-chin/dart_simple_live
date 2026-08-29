@@ -401,7 +401,9 @@ jobs:
 
       - name: Publish GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITHUB_TOKEN 是 Actions 应用身份，创建 Release 会 403。
+          # TOKEN 是仓库里已有的 PAT，旧正式发版 workflow 也用它。
+          GH_TOKEN: ${{ secrets.TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.resolve.outputs.tag }}
           TITLE: Simple Live App ${{ needs.resolve.outputs.version_name }}
