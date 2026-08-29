@@ -101,6 +101,14 @@ jobs:
           else
             printf '%s\n' "$NOTES" > release_notes.md
           fi
+          BODY="$(
+            sed -e '/^## 更新内容$/d' -e '/^（必填：/d' -e '/^[[:space:]]*$/d' release_notes.md
+          )"
+          if [ -z "$BODY" ]; then
+            echo "更新内容是必填的，annotated tag / 提交列表不能为空" >&2
+            cat release_notes.md
+            exit 1
+          fi
           cat release_notes.md
 
       - uses: actions/upload-artifact@v4

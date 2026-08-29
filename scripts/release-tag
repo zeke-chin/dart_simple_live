@@ -17,13 +17,15 @@ usage() {
 scripts/release-tag
 
 读取 simple_live_app/pubspec.yaml 的 version（+ 号前面），校验即将打的
-git tag 必须是 v<version>。用上次版本 tag 以来的提交生成「更新内容」，
-写入 annotated tag。GitHub Action 发布时会把这段放到 Release 说明里。
+git tag 必须是 v<version>。
+
+「更新内容」必填：会显示在 GitHub Release 标题下方的说明里（不是只有提交 hash）。
+脚本用上次版本 tag 以来的提交生成草稿，你必须确认或改写；删空则拒绝打 tag。
 
 选项：
   --dry-run   只打印版本、tag 和更新说明
   --no-push   打本地 tag，不推送
-  --yes       跳过确认
+  --yes       跳过确认（更新内容仍不能为空）
   -h, --help  显示帮助
 EOF
 }
@@ -83,9 +85,23 @@ else
   log_range="HEAD"
 fi
 
+notes_has_body() {
+  local file="$1"
+  local body
+  body="$(
+    sed -e '/^## 更新内容$/d' \
+      -e '/^（必填：/d' \
+      -e '/^[[:space:]]*$/d' \
+      "$file"
+  )"
+  [ -n "$body" ]
+}
+
 notes="$(
   {
     echo "## 更新内容"
+    echo
+    echo "（必填：这段会显示在 GitHub Release 说明里，不能为空。可改写下面的提交列表。）"
     echo
     if [ -n "$prev" ]; then
       git log --no-merges --pretty=format:'- %s' "$log_range"
@@ -143,15 +159,19 @@ printf '%s\n' "$notes" >"$notes_file"
 
 if [ -t 0 ] && [ "$assume_yes" -ne 1 ]; then
   editor="${EDITOR:-${VISUAL:-nano}}"
-  echo "正在用 ${editor} 编辑更新说明，保存后关闭即可。"
+  echo "正在用 ${editor} 编辑更新说明（必填，保存后关闭）。"
   "$editor" "$notes_file"
-  if [ ! -s "$notes_file" ]; then
-    echo "更新说明是空的" >&2
-    exit 1
-  fi
 fi
 
-git tag -a "$tag" -F "$notes_file"
+if ! notes_has_body "$notes_file"; then
+  echo "更新内容是必填的，不能为空。这段会写进 GitHub Release 说明。" >&2
+  exit 1
+fi
+
+cleaned_notes="$(mktemp)"
+sed -e '/^（必填：/d' "$notes_file" >"$cleaned_notes"
+git tag -a "$tag" -F "$cleaned_notes"
+rm -f "$cleaned_notes"
 echo "已创建本地 tag ${tag}"
 
 if [ "$do_push" -eq 1 ]; then
