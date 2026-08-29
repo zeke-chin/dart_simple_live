@@ -1,0 +1,355 @@
+# Simple Live App 构建并发布到 GitHub Release。
+#
+# 发版：先改 simple_live_app/pubspec.yaml 的 version（例如 1.12.0+11200），
+# commit 后打同号 tag 并推送：git tag v1.12.0 && git push origin v1.12.0
+# tag 必须等于 pubspec 里 + 号前面的版本号，对不上会失败。
+# 也可以在 Actions 里手动跑本 workflow（可填 tag，留空则构建当前选中的分支）。
+
+name: release-app
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要构建的 tag，例如 v1.12.0。留空则构建当前分支，Release 仍用 pubspec 版本号。"
+        required: false
+        type: string
+
+concurrency:
+  group: release-app-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-22.04
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      version_name: ${{ steps.meta.outputs.version_name }}
+      version_code: ${{ steps.meta.outputs.version_code }}
+      tag: ${{ steps.meta.outputs.tag }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - id: meta
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse HEAD)"
+          LINE="$(grep -E '^version:' simple_live_app/pubspec.yaml | head -n1)"
+          VER="$(echo "${LINE#version:}" | tr -d '[:space:]')"
+          NAME="${VER%%+*}"
+          CODE="${VER##*+}"
+          TAG="v${NAME}"
+
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "${TAG}" ]; then
+            echo "git tag ${GITHUB_REF_NAME} 和 pubspec.yaml 的 ${NAME} 不一致"
+            echo "请把 pubspec version 改成 ${GITHUB_REF_NAME#v}+构建号，或改打 ${TAG}"
+            exit 1
+          fi
+
+          INPUT_TAG="${{ github.event.inputs.tag }}"
+          if [ -n "${INPUT_TAG}" ] && [ "${INPUT_TAG}" != "${TAG}" ]; then
+            echo "手动填写的 tag ${INPUT_TAG} 和 pubspec.yaml 的 ${NAME} 不一致"
+            exit 1
+          fi
+
+          PRERELEASE=false
+          case "${NAME}" in
+            *alpha*|*beta*|*rc*) PRERELEASE=true ;;
+          esac
+
+          {
+            echo "sha=${SHA}"
+            echo "version_name=${NAME}"
+            echo "version_code=${CODE}"
+            echo "tag=${TAG}"
+            echo "prerelease=${PRERELEASE}"
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "sha=${SHA}"
+          echo "version=${NAME}+${CODE}"
+          echo "release_tag=${TAG}"
+
+  build-android:
+    needs: resolve
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Download Android keystore
+        id: android_keystore
+        uses: timheuer/base64-to-file@v1.2
+        with:
+          fileName: keystore.jks
+          encodedString: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Create key.properties
+        run: |
+          echo "storeFile=${{ steps.android_keystore.outputs.filePath }}" > simple_live_app/android/key.properties
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> simple_live_app/android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> simple_live_app/android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> simple_live_app/android/key.properties
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+          cache: "gradle"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Restore packages
+        working-directory: simple_live_app
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: simple_live_app
+        run: flutter build apk --release --split-per-abi --dart-define=GIT_COMMIT=${{ needs.resolve.outputs.sha }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          if-no-files-found: error
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+
+  build-ios:
+    needs: resolve
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Restore packages
+        working-directory: simple_live_app
+        run: flutter pub get
+
+      - name: Build IPA
+        working-directory: simple_live_app
+        run: flutter build ios --release --no-codesign --dart-define=GIT_COMMIT=${{ needs.resolve.outputs.sha }}
+
+      - name: Create unsigned IPA
+        working-directory: simple_live_app
+        run: |
+          mkdir -p build/ios/iphoneos/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/Runner.app
+          cd build/ios/iphoneos
+          zip -q -r ios-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          if-no-files-found: error
+          path: simple_live_app/build/ios/iphoneos/ios-unsigned.ipa
+
+  build-macos:
+    needs: resolve
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_26.3.app/Contents/Developer
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Enable Flutter Desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Restore packages
+        working-directory: simple_live_app
+        run: flutter pub get
+
+      - name: Install appdmg
+        run: npm install -g appdmg
+
+      - name: Install flutter_distributor
+        run: dart pub global activate flutter_distributor
+
+      - name: Build macOS
+        working-directory: simple_live_app
+        run: flutter_distributor package --platform macos --targets dmg,zip --skip-clean
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          if-no-files-found: error
+          path: |
+            simple_live_app/build/dist/*/*.dmg
+            simple_live_app/build/dist/*/*.zip
+
+  build-linux:
+    needs: resolve
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libasound2-dev libmpv-dev mpv
+
+      - name: Enable Flutter Desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Restore packages
+        working-directory: simple_live_app
+        run: flutter pub get
+
+      - name: Install flutter_distributor
+        run: dart pub global activate flutter_distributor
+
+      - name: Build Linux
+        working-directory: simple_live_app
+        run: flutter_distributor package --platform linux --targets deb,zip --skip-clean
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          if-no-files-found: error
+          path: |
+            simple_live_app/build/dist/*/*.deb
+            simple_live_app/build/dist/*/*.zip
+
+  build-windows:
+    needs: resolve
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.3"
+          cache: true
+
+      - name: Enable Flutter Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Restore packages
+        working-directory: simple_live_app
+        run: flutter pub get
+
+      - name: Install flutter_distributor
+        run: dart pub global activate flutter_distributor
+
+      - name: Build Windows
+        working-directory: simple_live_app
+        run: flutter_distributor package --platform windows --targets msix,zip --skip-clean
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          path: |
+            simple_live_app/build/dist/*/*.msix
+            simple_live_app/build/dist/*/*.zip
+
+  publish:
+    needs:
+      - resolve
+      - build-android
+      - build-ios
+      - build-macos
+      - build-linux
+      - build-windows
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Rename artifacts
+        env:
+          VERSION: ${{ needs.resolve.outputs.version_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          copy_one() {
+            local dest="$1"
+            local dir="$2"
+            local name="$3"
+            mapfile -t files < <(find "$dir" -type f -name "$name" | sort)
+            if [ "${#files[@]}" -ne 1 ]; then
+              echo "expected 1 file named ${name} under ${dir}, got ${#files[@]}"
+              find "$dir" -type f -print || true
+              exit 1
+            fi
+            cp "${files[0]}" "$dest"
+            echo "copied ${files[0]} -> ${dest}"
+          }
+
+          copy_one "dist/SimpleLiveApp-${VERSION}-android-arm64.apk" artifacts/android "app-arm64-v8a-release.apk"
+          copy_one "dist/SimpleLiveApp-${VERSION}-android-armv7.apk" artifacts/android "app-armeabi-v7a-release.apk"
+          copy_one "dist/SimpleLiveApp-${VERSION}-android-x86_64.apk" artifacts/android "app-x86_64-release.apk"
+          copy_one "dist/SimpleLiveApp-${VERSION}-ios-unsigned.ipa" artifacts/ios "*.ipa"
+          copy_one "dist/SimpleLiveApp-${VERSION}-macos-arm64.dmg" artifacts/mac "*.dmg"
+          copy_one "dist/SimpleLiveApp-${VERSION}-macos-arm64.zip" artifacts/mac "*.zip"
+          copy_one "dist/SimpleLiveApp-${VERSION}-linux.deb" artifacts/linux "*.deb"
+          copy_one "dist/SimpleLiveApp-${VERSION}-linux.zip" artifacts/linux "*.zip"
+          copy_one "dist/SimpleLiveApp-${VERSION}-windows.msix" artifacts/windows "*.msix"
+          copy_one "dist/SimpleLiveApp-${VERSION}-windows.zip" artifacts/windows "*.zip"
+          ls -lh dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.resolve.outputs.tag }}
+          name: Simple Live App ${{ needs.resolve.outputs.version_name }}
+          target_commitish: ${{ needs.resolve.outputs.sha }}
+          generate_release_notes: true
+          prerelease: ${{ needs.resolve.outputs.prerelease }}
+          body: |
+            Simple Live App ${{ needs.resolve.outputs.version_name }} (${{ needs.resolve.outputs.version_code }})
+            commit: ${{ needs.resolve.outputs.sha }}
+
+            iOS 为未签名包，需自行侧载。
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
