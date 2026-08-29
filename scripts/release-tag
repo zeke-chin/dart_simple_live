@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# 在本地做发版前置校验，打与 pubspec 一致的 annotated tag，并写入更新说明。
+# 用法：
+#   scripts/release-tag              # 校验、编辑说明、打 tag、推送
+#   scripts/release-tag --dry-run    # 只打印，不打 tag
+#   scripts/release-tag --no-push    # 只打本地 tag
+#   scripts/release-tag --yes        # 不再确认
+
+set -euo pipefail
+
+dry_run=0
+do_push=1
+assume_yes=0
+
+usage() {
+  cat <<'EOF'
+scripts/release-tag
+
+读取 simple_live_app/pubspec.yaml 的 version（+ 号前面），校验即将打的
+git tag 必须是 v<version>。用上次版本 tag 以来的提交生成「更新内容」，
+写入 annotated tag。GitHub Action 发布时会把这段放到 Release 说明里。
+
+选项：
+  --dry-run   只打印版本、tag 和更新说明
+  --no-push   打本地 tag，不推送
+  --yes       跳过确认
+  -h, --help  显示帮助
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) dry_run=1 ;;
+    --no-push) do_push=0 ;;
+    --yes|-y) assume_yes=1 ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "未知参数: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+pubspec="simple_live_app/pubspec.yaml"
+if [ ! -f "$pubspec" ]; then
+  echo "找不到 $pubspec" >&2
+  exit 1
+fi
+
+line="$(grep -E '^version:' "$pubspec" | head -n1)"
+ver="$(echo "${line#version:}" | tr -d '[:space:]')"
+if [ -z "$ver" ]; then
+  echo "无法从 $pubspec 读取 version" >&2
+  exit 1
+fi
+
+version_name="${ver%%+*}"
+version_code="${ver##*+}"
+tag="v${version_name}"
+
+if [[ ! "$version_name" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "pubspec version 格式不像 x.y.z: ${version_name}" >&2
+  exit 1
+fi
+
+if [ "$tag" = "v" ]; then
+  echo "计算出的 tag 为空" >&2
+  exit 1
+fi
+
+prev="$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -vx "$tag" | head -n1 || true)"
+if [ -n "$prev" ]; then
+  log_range="${prev}..HEAD"
+else
+  log_range="HEAD"
+fi
+
+notes="$(
+  {
+    echo "## 更新内容"
+    echo
+    if [ -n "$prev" ]; then
+      git log --no-merges --pretty=format:'- %s' "$log_range"
+    else
+      git log --no-merges --pretty=format:'- %s' -20
+    fi
+    echo
+  }
+)"
+
+echo "pubspec: ${ver}"
+echo "tag:     ${tag}  （必须等于 v + pubspec 里 + 号前面的 ${version_name}）"
+echo "构建号:  ${version_code}"
+if [ -n "$prev" ]; then
+  echo "上次 tag: ${prev}"
+else
+  echo "上次 tag: （没有找到 v* 版本 tag）"
+fi
+echo
+echo "$notes"
+echo
+
+if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+  echo "本地已存在 tag ${tag}" >&2
+  exit 1
+fi
+
+if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+  echo "远程已存在 tag ${tag}" >&2
+  exit 1
+fi
+
+if [ "$dry_run" -eq 1 ]; then
+  echo "dry-run：未打 tag。"
+  exit 0
+fi
+
+if [ "$assume_yes" -ne 1 ]; then
+  printf "用以上说明创建并%s tag %s？[y/N] " \
+    "$( [ "$do_push" -eq 1 ] && echo 推送 || echo 保存 )" \
+    "$tag"
+  read -r reply
+  case "$reply" in
+    y|Y|yes|YES) ;;
+    *)
+      echo "已取消"
+      exit 1
+      ;;
+  esac
+fi
+
+notes_file="$(mktemp)"
+trap 'rm -f "$notes_file"' EXIT
+printf '%s\n' "$notes" >"$notes_file"
+
+if [ -t 0 ] && [ "$assume_yes" -ne 1 ]; then
+  editor="${EDITOR:-${VISUAL:-nano}}"
+  echo "正在用 ${editor} 编辑更新说明，保存后关闭即可。"
+  "$editor" "$notes_file"
+  if [ ! -s "$notes_file" ]; then
+    echo "更新说明是空的" >&2
+    exit 1
+  fi
+fi
+
+git tag -a "$tag" -F "$notes_file"
+echo "已创建本地 tag ${tag}"
+
+if [ "$do_push" -eq 1 ]; then
+  git push origin "$tag"
+  echo "已推送 ${tag}，GitHub Action release-app 会开始构建。"
+  echo "Release 说明会使用刚才的「更新内容」。"
+else
+  echo "未推送。之后执行: git push origin ${tag}"
+fi

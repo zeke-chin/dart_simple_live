@@ -1,9 +1,9 @@
 # Simple Live App 构建并发布到 GitHub Release。
 #
 # 发版：先改 simple_live_app/pubspec.yaml 的 version（例如 1.12.0+11200），
-# commit 后打同号 tag 并推送：git tag v1.12.0 && git push origin v1.12.0
-# tag 必须等于 pubspec 里 + 号前面的版本号，对不上会失败。
-# 也可以在 Actions 里手动跑本 workflow（可填 tag，留空则构建当前选中的分支）。
+# 再运行 scripts/release-tag（会校验 tag == v + pubspec 版本，并写入更新说明）。
+# 也可以手动 git tag v1.12.0 && git push origin v1.12.0，对不上会失败。
+# Actions 里也可手动跑本 workflow（可填 tag，留空则构建当前选中的分支）。
 
 name: release-app
 
@@ -78,6 +78,36 @@ jobs:
           echo "sha=${SHA}"
           echo "version=${NAME}+${CODE}"
           echo "release_tag=${TAG}"
+
+      - name: Collect release notes
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.meta.outputs.tag }}"
+          git fetch --tags --force origin || true
+          NOTES="$(git for-each-ref "refs/tags/${TAG}" --format='%(contents)' 2>/dev/null || true)"
+          NOTES="$(printf '%s' "$NOTES" | sed -e 's/[[:space:]]*$//')"
+          if [ -z "$NOTES" ]; then
+            PREV="$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -vx "$TAG" | head -n1 || true)"
+            {
+              echo "## 更新内容"
+              echo
+              if [ -n "$PREV" ]; then
+                git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD"
+              else
+                git log --no-merges --pretty=format:'- %s' -20
+              fi
+              echo
+            } > release_notes.md
+          else
+            printf '%s\n' "$NOTES" > release_notes.md
+          fi
+          cat release_notes.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          if-no-files-found: error
+          path: release_notes.md
 
   build-android:
     needs: resolve
@@ -304,6 +334,30 @@ jobs:
         with:
           path: artifacts
 
+      - name: Compose release body
+        env:
+          VERSION: ${{ needs.resolve.outputs.version_name }}
+          CODE: ${{ needs.resolve.outputs.version_code }}
+          SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          NOTES_FILE="artifacts/release-notes/release_notes.md"
+          if [ ! -f "$NOTES_FILE" ]; then
+            echo "missing ${NOTES_FILE}" >&2
+            find artifacts -type f -print || true
+            exit 1
+          fi
+          {
+            cat "$NOTES_FILE"
+            echo
+            echo "---"
+            echo "Simple Live App ${VERSION} (${CODE})"
+            echo "commit: ${SHA}"
+            echo
+            echo "iOS 为未签名包，需自行侧载。"
+          } > release_body.md
+          cat release_body.md
+
       - name: Rename artifacts
         env:
           VERSION: ${{ needs.resolve.outputs.version_name }}
@@ -343,13 +397,9 @@ jobs:
           tag_name: ${{ needs.resolve.outputs.tag }}
           name: Simple Live App ${{ needs.resolve.outputs.version_name }}
           target_commitish: ${{ needs.resolve.outputs.sha }}
-          generate_release_notes: true
+          generate_release_notes: false
           prerelease: ${{ needs.resolve.outputs.prerelease }}
-          body: |
-            Simple Live App ${{ needs.resolve.outputs.version_name }} (${{ needs.resolve.outputs.version_code }})
-            commit: ${{ needs.resolve.outputs.sha }}
-
-            iOS 为未签名包，需自行侧载。
+          body_path: release_body.md
           files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
