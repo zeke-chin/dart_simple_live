@@ -75,8 +75,8 @@ App 需要修改 Hive 模型字段后运行 `dart run build_runner build` 重新
 
 不要手打 `git tag`。流程是：先改 `simple_live_app/pubspec.yaml` 的 `version`，再在仓库根目录跑 `scripts/release-tag`。
 
-- 版本号唯一来源是 `simple_live_app/pubspec.yaml` 的 `version: x.y.z+code`（如 `1.11.4+11104`）。`+` 前是版本名，后是构建号（`1.11.4` → `11104`）。
-- git tag **必须**等于 `v<版本名>`（如 `v1.11.4`）。脚本和 `release-app` workflow 都会校验，和 pubspec 对不上直接失败。
+- 版本号唯一来源是 `simple_live_app/pubspec.yaml` 的 `version: x.y.z+code`（如 `1.12.0+11200`）。`+` 前是版本名，后是构建号（`1.12.0` → `11200`）。
+- git tag **必须**等于 `v<版本名>`（如 `v1.12.0`）。脚本和 `release-app` workflow 都会校验，和 pubspec 对不上直接失败。
 - **更新内容必填**。它会出现在 GitHub Release 标题下面的说明区（就是现在「Latest Build」里「自动构建版本 / 提交: xxx」那一块），不能为空、也不能只留提交 hash。脚本会用上次 `v*` tag 以来的提交生成草稿，打开编辑器让你改；删空则拒绝打 tag。
 - 推送 tag 后 `release-app` 构建全平台：Android APK、iOS 未签名 IPA、macOS dmg/zip、Linux deb、Windows msix。产物名 `SimpleLiveApp-<版本>-<平台>`。
 - 版本名含 alpha/beta/rc 会标成 prerelease。
