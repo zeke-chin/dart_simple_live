@@ -89,7 +89,7 @@ notes_has_body() {
   local file="$1"
   local body
   body="$(
-    sed -e '/^## 更新内容$/d' \
+    sed -e '/^更新内容$/d' \
       -e '/^（必填：/d' \
       -e '/^[[:space:]]*$/d' \
       "$file"
@@ -99,7 +99,7 @@ notes_has_body() {
 
 notes="$(
   {
-    echo "## 更新内容"
+    echo "更新内容"
     echo
     echo "（必填：这段会显示在 GitHub Release 说明里，不能为空。可改写下面的提交列表。）"
     echo

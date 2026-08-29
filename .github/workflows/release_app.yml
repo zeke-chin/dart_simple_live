@@ -89,7 +89,7 @@ jobs:
           if [ -z "$NOTES" ]; then
             PREV="$(git tag -l 'v[0-9]*' --sort=-v:refname | grep -vx "$TAG" | head -n1 || true)"
             {
-              echo "## 更新内容"
+              echo "更新内容"
               echo
               if [ -n "$PREV" ]; then
                 git log --no-merges --pretty=format:'- %s' "${PREV}..HEAD"
@@ -102,7 +102,7 @@ jobs:
             printf '%s\n' "$NOTES" > release_notes.md
           fi
           BODY="$(
-            sed -e '/^## 更新内容$/d' -e '/^（必填：/d' -e '/^[[:space:]]*$/d' release_notes.md
+            sed -e '/^更新内容$/d' -e '/^（必填：/d' -e '/^[[:space:]]*$/d' release_notes.md
           )"
           if [ -z "$BODY" ]; then
             echo "更新内容是必填的，annotated tag / 提交列表不能为空" >&2
