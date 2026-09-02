@@ -46,6 +46,8 @@ class AppSettingsController extends GetxController {
 
     hardwareDecode.value = LocalStorageService.instance
         .getValue(LocalStorageService.kHardwareDecode, true);
+    rtxVsr.value = LocalStorageService.instance
+        .getValue(LocalStorageService.kRtxVsr, false);
     chatTextSize.value = LocalStorageService.instance
         .getValue(LocalStorageService.kChatTextSize, 14.0);
 
@@ -151,6 +153,11 @@ class AppSettingsController extends GetxController {
 
     customPlayerOutput.value = LocalStorageService.instance
         .getValue(LocalStorageService.kCustomPlayerOutput, false);
+    if (rtxVsr.value && customPlayerOutput.value) {
+      customPlayerOutput.value = false;
+      LocalStorageService.instance
+          .setValue(LocalStorageService.kCustomPlayerOutput, false);
+    }
 
     videoOutputDriver.value = LocalStorageService.instance.getValue(
       LocalStorageService.kVideoOutputDriver,
@@ -278,6 +285,15 @@ class AppSettingsController extends GetxController {
     hardwareDecode.value = e;
     LocalStorageService.instance
         .setValue(LocalStorageService.kHardwareDecode, e);
+  }
+
+  var rtxVsr = false.obs;
+  void setRtxVsr(bool e) {
+    if (e && customPlayerOutput.value) {
+      setCustomPlayerOutput(false);
+    }
+    rtxVsr.value = e;
+    LocalStorageService.instance.setValue(LocalStorageService.kRtxVsr, e);
   }
 
   var chatTextSize = 14.0.obs;
@@ -556,6 +572,9 @@ class AppSettingsController extends GetxController {
 
   var customPlayerOutput = false.obs;
   void setCustomPlayerOutput(bool e) {
+    if (e && rtxVsr.value) {
+      setRtxVsr(false);
+    }
     customPlayerOutput.value = e;
     LocalStorageService.instance
         .setValue(LocalStorageService.kCustomPlayerOutput, e);

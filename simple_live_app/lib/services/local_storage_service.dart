@@ -74,6 +74,9 @@ class LocalStorageService extends GetxService {
   /// 硬件解码
   static const String kHardwareDecode = "HardwareDecode";
 
+  /// NVIDIA RTX 视频超分辨率
+  static const String kRtxVsr = "RtxVsr";
+
   /// 聊天区文字大小
   static const String kChatTextSize = "ChatTextSize";
 

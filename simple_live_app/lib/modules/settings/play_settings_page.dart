@@ -42,6 +42,17 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
                     },
                   ),
                 ),
+                if (Platform.isWindows) AppStyle.divider,
+                if (Platform.isWindows)
+                  Obx(
+                    () => SettingsSwitch(
+                      title: "NVIDIA RTX VSR",
+                      subtitle:
+                          "需要 RTX 20 系及以上，并在 NVIDIA App 中开启 RTX 视频超分辨率；重新进入直播间后生效",
+                      value: controller.rtxVsr.value,
+                      onChanged: controller.setRtxVsr,
+                    ),
+                  ),
                 if (Platform.isAndroid) AppStyle.divider,
                 Obx(
                   () => Visibility(
