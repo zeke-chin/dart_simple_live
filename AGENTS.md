@@ -87,6 +87,7 @@ App 需要修改 Hive 模型字段后运行 `dart run build_runner build` 重新
 - **Flutter 版本固定 3.38**（CI 用 3.38.3），升级 Flutter 前先跑一遍测试。
 - pubspec 里有几个**故意锁死的版本**，不要随意升级：`dynamic_color: 1.8.1`（1.9.0 的 Android Gradle 与当前 AGP/Kotlin 不兼容）、`auto_orientation_v2: 2.3.8`（2.4.6 Android pluginClass 包名错误）、`hive: 2.2.3`、`flutter_easyrefresh: 2.2.2`。
 - 视频播放依赖系统 mpv（media_kit），Linux 构建需先装 mpv 相关包。
+- Windows 本地运行：路径过长会触发 `MSB3491`，用 `subst` 映射短盘符后再编；需要 NuGet CLI 在 PATH 里。详见 `simple_live_app/docs/windows.md`。
 - Android 构建需要签名：CI 用 secrets 生成 `android/key.properties`；本地调试构建一般用 debug 签名即可。
 - 代码注释和 UI 文案是中文，新代码沿用中文注释风格。
 - 提交信息习惯用中文（git log 中 `feat:` / `fix:` / `ci:` 前缀 + 中文描述）。
