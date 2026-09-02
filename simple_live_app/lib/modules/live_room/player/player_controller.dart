@@ -19,12 +19,26 @@ import 'package:simple_live_app/app/controller/base_controller.dart';
 import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
+import 'package:simple_live_app/modules/live_room/player/rtx_vsr_output.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 mixin PlayerMixin {
+  static const _rtxVsrFilterPrefix =
+      'd3d11vpp=format=nv12:scaling-mode=nvidia:scale=';
+
   GlobalKey<VideoState> globalPlayerKey = GlobalKey<VideoState>();
   GlobalKey globalDanmuKey = GlobalKey();
+
+  Timer? _rtxVsrResizeTimer;
+  Size? _rtxVsrViewportSize;
+  BoxFit _rtxVsrFit = BoxFit.contain;
+  String? _lastRtxVsrFilter;
+  Size? _lastRtxVsrOutputSize;
+  int _rtxVsrUpdateGeneration = 0;
+
+  bool get _rtxVsrEnabled =>
+      Platform.isWindows && AppSettingsController.instance.rtxVsr.value;
 
   /// 播放器实例
   late final player = Player(
@@ -39,12 +53,18 @@ mixin PlayerMixin {
   /// 初始化播放器并设置 ao 参数
   Future<void> initializePlayer() async {
     var pp = player.platform as NativePlayer;
-    if (Platform.isWindows && AppSettingsController.instance.rtxVsr.value) {
+    if (_rtxVsrEnabled) {
+      _rtxVsrResizeTimer?.cancel();
+      _rtxVsrUpdateGeneration++;
+      _lastRtxVsrFilter = null;
+      _lastRtxVsrOutputSize = null;
       await pp.setProperty('hwdec', 'd3d11va');
+      const filter = '${_rtxVsrFilterPrefix}1.0000';
       await pp.setProperty(
         'vf',
-        'd3d11vpp=format=nv12:scale=2:scaling-mode=nvidia',
+        filter,
       );
+      _lastRtxVsrFilter = filter;
     }
     // 设置音频输出驱动
     if (AppSettingsController.instance.customPlayerOutput.value) {
@@ -59,6 +79,111 @@ mixin PlayerMixin {
     if (Platform.isAndroid) {
       await pp.setProperty('force-seekable', 'yes');
     }
+  }
+
+  void updateRtxVsrViewport({
+    required Size logicalSize,
+    required double devicePixelRatio,
+    required BoxFit fit,
+  }) {
+    if (!_rtxVsrEnabled ||
+        logicalSize.isEmpty ||
+        !logicalSize.width.isFinite ||
+        !logicalSize.height.isFinite ||
+        devicePixelRatio <= 0) {
+      return;
+    }
+
+    final viewportSize = Size(
+      (logicalSize.width * devicePixelRatio).roundToDouble(),
+      (logicalSize.height * devicePixelRatio).roundToDouble(),
+    );
+    if (_rtxVsrViewportSize == viewportSize && _rtxVsrFit == fit) {
+      return;
+    }
+
+    _rtxVsrViewportSize = viewportSize;
+    _rtxVsrFit = fit;
+    scheduleRtxVsrOutputUpdate();
+  }
+
+  void scheduleRtxVsrOutputUpdate() {
+    if (!_rtxVsrEnabled || _rtxVsrViewportSize == null) {
+      return;
+    }
+    _rtxVsrResizeTimer?.cancel();
+    final generation = ++_rtxVsrUpdateGeneration;
+    _rtxVsrResizeTimer = Timer(const Duration(milliseconds: 200), () {
+      unawaited(_updateRtxVsrOutput(generation));
+    });
+  }
+
+  Future<void> _updateRtxVsrOutput(int generation) async {
+    final viewportSize = _rtxVsrViewportSize;
+    if (!_rtxVsrEnabled || viewportSize == null) {
+      return;
+    }
+
+    try {
+      final pp = player.platform as NativePlayer;
+      final dimensions = await Future.wait([
+        pp.getProperty('video-dec-params/w'),
+        pp.getProperty('video-dec-params/h'),
+      ]);
+      if (generation != _rtxVsrUpdateGeneration) {
+        return;
+      }
+
+      final sourceWidth = int.tryParse(dimensions[0]);
+      final sourceHeight = int.tryParse(dimensions[1]);
+      if (sourceWidth == null || sourceHeight == null) {
+        return;
+      }
+
+      final output = calculateRtxVsrOutput(
+        sourceWidth: sourceWidth,
+        sourceHeight: sourceHeight,
+        viewportWidth: viewportSize.width.toInt(),
+        viewportHeight: viewportSize.height.toInt(),
+        fit: _rtxVsrFit,
+      );
+      if (output == null) {
+        return;
+      }
+
+      final filter = '$_rtxVsrFilterPrefix${output.scale.toStringAsFixed(4)}';
+      final outputSize =
+          Size(output.width.toDouble(), output.height.toDouble());
+      if (_lastRtxVsrFilter == filter && _lastRtxVsrOutputSize == outputSize) {
+        return;
+      }
+
+      if (_lastRtxVsrFilter != filter) {
+        await pp.setProperty('vf', filter);
+        _lastRtxVsrFilter = filter;
+      }
+      if (_lastRtxVsrOutputSize != outputSize) {
+        await videoController.setSize(
+          width: output.width,
+          height: output.height,
+        );
+        _lastRtxVsrOutputSize = outputSize;
+      }
+      Log.d(
+        'RTX VSR: source=${sourceWidth}x$sourceHeight, '
+        'viewport=${viewportSize.width.toInt()}x${viewportSize.height.toInt()}, '
+        'scale=${output.scale.toStringAsFixed(4)}, '
+        'output=${output.width}x${output.height}',
+      );
+    } catch (e) {
+      Log.w('更新 RTX VSR 输出尺寸失败：$e');
+    }
+  }
+
+  void disposeRtxVsrOutput() {
+    _rtxVsrResizeTimer?.cancel();
+    _rtxVsrResizeTimer = null;
+    _rtxVsrUpdateGeneration++;
   }
 
   /// 视频控制器
@@ -705,6 +830,7 @@ class PlayerController extends BaseController
       if (event) {
         WakelockPlus.enable();
         Log.d("Playing");
+        scheduleRtxVsrOutputUpdate();
       }
     });
 
@@ -721,12 +847,14 @@ class PlayerController extends BaseController
           'width:$event  W:${(player.state.width)}  H:${(player.state.height)}');
       isVertical.value =
           (player.state.height ?? 9) > (player.state.width ?? 16);
+      scheduleRtxVsrOutputUpdate();
     });
     _heightSubscription = player.stream.height.listen((event) {
       Log.d(
           'height:$event  W:${(player.state.width)}  H:${(player.state.height)}');
       isVertical.value =
           (player.state.height ?? 9) > (player.state.width ?? 16);
+      scheduleRtxVsrOutputUpdate();
     });
   }
 
@@ -738,6 +866,7 @@ class PlayerController extends BaseController
     _logSubscription?.cancel();
     _pipSubscription?.cancel();
     _playingSubscription?.cancel();
+    disposeRtxVsrOutput();
   }
 
   void mediaEnd() {

@@ -254,35 +254,44 @@ class LiveRoomPage extends GetView<LiveRoomController> {
       boxFit = BoxFit.contain;
       aspectRatio = 4 / 3;
     }
-    return Stack(
-      children: [
-        Video(
-          key: controller.globalPlayerKey,
-          controller: controller.videoController,
-          pauseUponEnteringBackgroundMode:
-              AppSettingsController.instance.playerAutoPause.value,
-          resumeUponEnteringForegroundMode:
-              AppSettingsController.instance.playerAutoPause.value,
-          controls: (state) {
-            return playerControls(state, controller);
-          },
-          aspectRatio: aspectRatio,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        controller.updateRtxVsrViewport(
+          logicalSize: constraints.biggest,
+          devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
           fit: boxFit,
-          // 自己实现
-          wakelock: false,
-        ),
-        Obx(
-          () => Visibility(
-            visible: !controller.liveStatus.value,
-            child: const Center(
-              child: Text(
-                "未开播",
-                style: TextStyle(fontSize: 16, color: Colors.white),
+        );
+        return Stack(
+          children: [
+            Video(
+              key: controller.globalPlayerKey,
+              controller: controller.videoController,
+              pauseUponEnteringBackgroundMode:
+                  AppSettingsController.instance.playerAutoPause.value,
+              resumeUponEnteringForegroundMode:
+                  AppSettingsController.instance.playerAutoPause.value,
+              controls: (state) {
+                return playerControls(state, controller);
+              },
+              aspectRatio: aspectRatio,
+              fit: boxFit,
+              // 自己实现
+              wakelock: false,
+            ),
+            Obx(
+              () => Visibility(
+                visible: !controller.liveStatus.value,
+                child: const Center(
+                  child: Text(
+                    "未开播",
+                    style: TextStyle(fontSize: 16, color: Colors.white),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
