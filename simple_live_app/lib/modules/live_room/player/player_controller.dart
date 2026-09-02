@@ -39,6 +39,13 @@ mixin PlayerMixin {
   /// 初始化播放器并设置 ao 参数
   Future<void> initializePlayer() async {
     var pp = player.platform as NativePlayer;
+    if (Platform.isWindows && AppSettingsController.instance.rtxVsr.value) {
+      await pp.setProperty('hwdec', 'd3d11va');
+      await pp.setProperty(
+        'vf',
+        'd3d11vpp=format=nv12:scale=2:scaling-mode=nvidia',
+      );
+    }
     // 设置音频输出驱动
     if (AppSettingsController.instance.customPlayerOutput.value) {
       if (player.platform is NativePlayer) {
@@ -49,7 +56,7 @@ mixin PlayerMixin {
       }
     }
     // media_kit 仓库更新导致的问题，临时解决办法
-    if(Platform.isAndroid){
+    if (Platform.isAndroid) {
       await pp.setProperty('force-seekable', 'yes');
     }
   }
@@ -57,21 +64,28 @@ mixin PlayerMixin {
   /// 视频控制器
   late final videoController = VideoController(
     player,
-    configuration: AppSettingsController.instance.customPlayerOutput.value
-        ? VideoControllerConfiguration(
-            vo: AppSettingsController.instance.videoOutputDriver.value,
-            hwdec: AppSettingsController.instance.videoHardwareDecoder.value,
+    configuration: Platform.isWindows &&
+            AppSettingsController.instance.rtxVsr.value
+        ? const VideoControllerConfiguration(
+            vo: 'libmpv',
+            hwdec: 'd3d11va',
           )
-        : AppSettingsController.instance.playerCompatMode.value
-            ? const VideoControllerConfiguration(
-                vo: 'mediacodec_embed',
-                hwdec: 'mediacodec',
+        : AppSettingsController.instance.customPlayerOutput.value
+            ? VideoControllerConfiguration(
+                vo: AppSettingsController.instance.videoOutputDriver.value,
+                hwdec:
+                    AppSettingsController.instance.videoHardwareDecoder.value,
               )
-            : VideoControllerConfiguration(
-                enableHardwareAcceleration:
-                    AppSettingsController.instance.hardwareDecode.value,
-                androidAttachSurfaceAfterVideoParameters: false,
-              ),
+            : AppSettingsController.instance.playerCompatMode.value
+                ? const VideoControllerConfiguration(
+                    vo: 'mediacodec_embed',
+                    hwdec: 'mediacodec',
+                  )
+                : VideoControllerConfiguration(
+                    enableHardwareAcceleration:
+                        AppSettingsController.instance.hardwareDecode.value,
+                    androidAttachSurfaceAfterVideoParameters: false,
+                  ),
   );
 }
 

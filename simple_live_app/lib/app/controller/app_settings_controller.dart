@@ -47,7 +47,7 @@ class AppSettingsController extends GetxController {
     hardwareDecode.value = LocalStorageService.instance
         .getValue(LocalStorageService.kHardwareDecode, true);
     rtxVsr.value = LocalStorageService.instance
-        .getValue(LocalStorageService.kRtxVsr, false);
+        .getValue(LocalStorageService.kRtxVsr, true);
     chatTextSize.value = LocalStorageService.instance
         .getValue(LocalStorageService.kChatTextSize, 14.0);
 
@@ -154,9 +154,8 @@ class AppSettingsController extends GetxController {
     customPlayerOutput.value = LocalStorageService.instance
         .getValue(LocalStorageService.kCustomPlayerOutput, false);
     if (rtxVsr.value && customPlayerOutput.value) {
-      customPlayerOutput.value = false;
-      LocalStorageService.instance
-          .setValue(LocalStorageService.kCustomPlayerOutput, false);
+      rtxVsr.value = false;
+      LocalStorageService.instance.setValue(LocalStorageService.kRtxVsr, false);
     }
 
     videoOutputDriver.value = LocalStorageService.instance.getValue(
@@ -287,7 +286,7 @@ class AppSettingsController extends GetxController {
         .setValue(LocalStorageService.kHardwareDecode, e);
   }
 
-  var rtxVsr = false.obs;
+  var rtxVsr = true.obs;
   void setRtxVsr(bool e) {
     if (e && customPlayerOutput.value) {
       setCustomPlayerOutput(false);
