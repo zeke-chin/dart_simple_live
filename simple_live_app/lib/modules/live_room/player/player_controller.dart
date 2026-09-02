@@ -54,10 +54,7 @@ mixin PlayerMixin {
   Future<void> initializePlayer() async {
     var pp = player.platform as NativePlayer;
     if (_rtxVsrEnabled) {
-      _rtxVsrResizeTimer?.cancel();
-      _rtxVsrUpdateGeneration++;
-      _lastRtxVsrFilter = null;
-      _lastRtxVsrOutputSize = null;
+      _resetRtxVsrOutputState();
       await pp.setProperty('hwdec', 'd3d11va');
       const filter = '${_rtxVsrFilterPrefix}1.0000';
       await pp.setProperty(
@@ -81,13 +78,38 @@ mixin PlayerMixin {
     }
   }
 
+  Future<void> setRtxVsrEnabled(bool enabled) async {
+    if (!Platform.isWindows ||
+        AppSettingsController.instance.rtxVsr.value == enabled) {
+      return;
+    }
+
+    AppSettingsController.instance.setRtxVsr(enabled);
+    _resetRtxVsrOutputState();
+    try {
+      final pp = player.platform as NativePlayer;
+      if (enabled) {
+        await pp.setProperty('hwdec', 'd3d11va');
+        const filter = '${_rtxVsrFilterPrefix}1.0000';
+        await pp.setProperty('vf', filter);
+        _lastRtxVsrFilter = filter;
+        scheduleRtxVsrOutputUpdate();
+      } else {
+        await pp.setProperty('vf', '');
+        await videoController.setSize();
+      }
+    } catch (e) {
+      Log.w('切换 RTX VSR 失败：$e');
+      SmartDialog.showToast('切换 RTX VSR 失败，请重新进入直播间');
+    }
+  }
+
   void updateRtxVsrViewport({
     required Size logicalSize,
     required double devicePixelRatio,
     required BoxFit fit,
   }) {
-    if (!_rtxVsrEnabled ||
-        logicalSize.isEmpty ||
+    if (logicalSize.isEmpty ||
         !logicalSize.width.isFinite ||
         !logicalSize.height.isFinite ||
         devicePixelRatio <= 0) {
@@ -104,7 +126,9 @@ mixin PlayerMixin {
 
     _rtxVsrViewportSize = viewportSize;
     _rtxVsrFit = fit;
-    scheduleRtxVsrOutputUpdate();
+    if (_rtxVsrEnabled) {
+      scheduleRtxVsrOutputUpdate();
+    }
   }
 
   void scheduleRtxVsrOutputUpdate() {
@@ -181,8 +205,14 @@ mixin PlayerMixin {
   }
 
   void disposeRtxVsrOutput() {
+    _resetRtxVsrOutputState();
+  }
+
+  void _resetRtxVsrOutputState() {
     _rtxVsrResizeTimer?.cancel();
     _rtxVsrResizeTimer = null;
+    _lastRtxVsrFilter = null;
+    _lastRtxVsrOutputSize = null;
     _rtxVsrUpdateGeneration++;
   }
 

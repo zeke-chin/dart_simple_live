@@ -16,6 +16,7 @@ import 'package:simple_live_app/services/follow_service.dart';
 import 'package:simple_live_app/widgets/desktop_refresh_button.dart';
 import 'package:simple_live_app/widgets/follow_user_item.dart';
 import 'package:simple_live_app/widgets/net_image.dart';
+import 'package:simple_live_app/widgets/settings/settings_switch.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:simple_live_app/widgets/superchat_card.dart';
 import 'dart:async';
@@ -841,6 +842,22 @@ void showPlayerSettings(LiveRoomController controller) {
               title: Text("4:3"),
               visualDensity: VisualDensity.compact,
             ),
+            if (Platform.isWindows) ...[
+              const Divider(),
+              Padding(
+                padding: AppStyle.edgeInsetsH16,
+                child: Text(
+                  "画面增强",
+                  style: Get.textTheme.titleMedium,
+                ),
+              ),
+              SettingsSwitch(
+                title: "NVIDIA RTX VSR",
+                subtitle: "当前直播间立即生效",
+                value: AppSettingsController.instance.rtxVsr.value,
+                onChanged: controller.setRtxVsrEnabled,
+              ),
+            ],
           ],
         ),
       ),
