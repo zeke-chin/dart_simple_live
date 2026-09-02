@@ -53,6 +53,17 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
                       onChanged: controller.setRtxVsr,
                     ),
                   ),
+                if (Platform.isMacOS || Platform.isIOS) AppStyle.divider,
+                if (Platform.isMacOS || Platform.isIOS)
+                  Obx(
+                    () => SettingsSwitch(
+                      title: "Apple MetalFX 视频增强",
+                      subtitle:
+                          "按 Retina 实际像素实时放大；需要设备支持 MetalFX，可能增加耗电；重新进入直播间后生效",
+                      value: controller.metalFxSpatial.value,
+                      onChanged: controller.setMetalFxSpatial,
+                    ),
+                  ),
                 AppStyle.divider,
                 Obx(
                   () => SettingsSwitch(

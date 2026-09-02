@@ -77,6 +77,9 @@ class LocalStorageService extends GetxService {
   /// NVIDIA RTX 视频超分辨率
   static const String kRtxVsr = "RtxVsr";
 
+  /// Apple MetalFX 视频增强
+  static const String kMetalFxSpatial = "MetalFxSpatial";
+
   /// 在播放器画面上显示分辨率、码率和超分状态
   static const String kShowPlayerVideoStats = "ShowPlayerVideoStats";
 

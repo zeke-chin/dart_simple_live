@@ -19,6 +19,7 @@ import 'package:simple_live_app/app/controller/base_controller.dart';
 import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
+import 'package:simple_live_app/modules/live_room/player/metal_fx_spatial_output.dart';
 import 'package:simple_live_app/modules/live_room/player/player_video_stats.dart';
 import 'package:simple_live_app/modules/live_room/player/rtx_vsr_output.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -44,8 +45,20 @@ mixin PlayerMixin {
   bool _videoStatsRefreshing = false;
   final videoStats = Rxn<PlayerVideoStats>();
 
+  Timer? _metalFxSpatialResizeTimer;
+  Size? _metalFxSpatialViewportSize;
+  BoxFit _metalFxSpatialFit = BoxFit.contain;
+  Size? _lastMetalFxSpatialOutputSize;
+  int _metalFxSpatialUpdateGeneration = 0;
+  bool? _metalFxSpatialSupported;
+  bool _metalFxSpatialNativeEnabled = false;
+
   bool get _rtxVsrEnabled =>
       Platform.isWindows && AppSettingsController.instance.rtxVsr.value;
+
+  bool get _metalFxSpatialEnabled =>
+      (Platform.isMacOS || Platform.isIOS) &&
+      AppSettingsController.instance.metalFxSpatial.value;
 
   /// 播放器实例
   late final player = Player(
@@ -69,6 +82,14 @@ mixin PlayerMixin {
         filter,
       );
       _lastRtxVsrFilter = filter;
+    }
+    if (_metalFxSpatialEnabled) {
+      _metalFxSpatialSupported =
+          await videoController.isMetalFxSpatialSupported();
+      Log.d('MetalFX Spatial supported: $_metalFxSpatialSupported');
+      if (_metalFxSpatialSupported != true) {
+        AppSettingsController.instance.setMetalFxSpatial(false);
+      }
     }
     // 设置音频输出驱动
     if (AppSettingsController.instance.customPlayerOutput.value) {
@@ -226,6 +247,172 @@ mixin PlayerMixin {
     _rtxVsrUpdateGeneration++;
   }
 
+  Future<void> setMetalFxSpatialEnabled(bool enabled) async {
+    if ((!Platform.isMacOS && !Platform.isIOS) ||
+        AppSettingsController.instance.metalFxSpatial.value == enabled) {
+      return;
+    }
+
+    if (enabled) {
+      try {
+        final supported = await videoController.isMetalFxSpatialSupported();
+        _metalFxSpatialSupported = supported;
+        if (!supported) {
+          SmartDialog.showToast('当前设备不支持 Apple MetalFX 视频增强');
+          return;
+        }
+      } catch (e) {
+        Log.w('查询 MetalFX Spatial 支持失败：$e');
+        SmartDialog.showToast('无法启用 Apple MetalFX 视频增强');
+        return;
+      }
+    }
+
+    AppSettingsController.instance.setMetalFxSpatial(enabled);
+    _resetMetalFxSpatialOutputState();
+    if (enabled) {
+      scheduleMetalFxSpatialOutputUpdate();
+      return;
+    }
+
+    try {
+      await videoController.setMetalFxSpatial(enabled: false);
+      _metalFxSpatialNativeEnabled = false;
+    } catch (e) {
+      Log.w('关闭 MetalFX Spatial 失败：$e');
+    }
+  }
+
+  void updateMetalFxSpatialViewport({
+    required Size logicalSize,
+    required double devicePixelRatio,
+    required BoxFit fit,
+  }) {
+    if (logicalSize.isEmpty ||
+        !logicalSize.width.isFinite ||
+        !logicalSize.height.isFinite ||
+        devicePixelRatio <= 0) {
+      return;
+    }
+
+    final viewportSize = Size(
+      (logicalSize.width * devicePixelRatio).roundToDouble(),
+      (logicalSize.height * devicePixelRatio).roundToDouble(),
+    );
+    if (_metalFxSpatialViewportSize == viewportSize &&
+        _metalFxSpatialFit == fit) {
+      return;
+    }
+
+    _metalFxSpatialViewportSize = viewportSize;
+    _metalFxSpatialFit = fit;
+    if (_metalFxSpatialEnabled) {
+      scheduleMetalFxSpatialOutputUpdate();
+    }
+  }
+
+  void scheduleMetalFxSpatialOutputUpdate() {
+    if (!_metalFxSpatialEnabled ||
+        _metalFxSpatialViewportSize == null ||
+        _metalFxSpatialSupported == false) {
+      return;
+    }
+    _metalFxSpatialResizeTimer?.cancel();
+    final generation = ++_metalFxSpatialUpdateGeneration;
+    _metalFxSpatialResizeTimer = Timer(const Duration(milliseconds: 200), () {
+      unawaited(_updateMetalFxSpatialOutput(generation));
+    });
+  }
+
+  Future<void> _updateMetalFxSpatialOutput(int generation) async {
+    final viewportSize = _metalFxSpatialViewportSize;
+    if (!_metalFxSpatialEnabled || viewportSize == null) {
+      return;
+    }
+
+    try {
+      _metalFxSpatialSupported ??=
+          await videoController.isMetalFxSpatialSupported();
+      if (_metalFxSpatialSupported != true ||
+          generation != _metalFxSpatialUpdateGeneration) {
+        return;
+      }
+
+      final pp = player.platform as NativePlayer;
+      final dimensions = await Future.wait([
+        pp.getProperty('video-dec-params/w'),
+        pp.getProperty('video-dec-params/h'),
+      ]);
+      if (generation != _metalFxSpatialUpdateGeneration) {
+        return;
+      }
+
+      final sourceWidth = int.tryParse(dimensions[0]);
+      final sourceHeight = int.tryParse(dimensions[1]);
+      if (sourceWidth == null || sourceHeight == null) {
+        return;
+      }
+
+      final output = calculateMetalFxSpatialOutput(
+        sourceWidth: sourceWidth,
+        sourceHeight: sourceHeight,
+        viewportWidth: viewportSize.width.toInt(),
+        viewportHeight: viewportSize.height.toInt(),
+        fit: _metalFxSpatialFit,
+      );
+      if (output == null) {
+        if (_metalFxSpatialNativeEnabled) {
+          await videoController.setMetalFxSpatial(enabled: false);
+          _metalFxSpatialNativeEnabled = false;
+          _lastMetalFxSpatialOutputSize = null;
+        }
+        return;
+      }
+
+      final outputSize = Size(
+        output.width.toDouble(),
+        output.height.toDouble(),
+      );
+      if (_lastMetalFxSpatialOutputSize == outputSize &&
+          _metalFxSpatialNativeEnabled) {
+        return;
+      }
+
+      await videoController.setMetalFxSpatial(
+        enabled: true,
+        width: output.width,
+        height: output.height,
+      );
+      _metalFxSpatialNativeEnabled = true;
+      _lastMetalFxSpatialOutputSize = outputSize;
+      Log.d(
+        'MetalFX Spatial: source=${sourceWidth}x$sourceHeight, '
+        'viewport=${viewportSize.width.toInt()}x${viewportSize.height.toInt()}, '
+        'scale=${output.scale.toStringAsFixed(4)}, '
+        'output=${output.width}x${output.height}',
+      );
+    } catch (e) {
+      Log.w('更新 MetalFX Spatial 输出尺寸失败：$e');
+      _metalFxSpatialNativeEnabled = false;
+      _lastMetalFxSpatialOutputSize = null;
+      try {
+        await videoController.setMetalFxSpatial(enabled: false);
+      } catch (_) {}
+    }
+  }
+
+  void disposeMetalFxSpatialOutput() {
+    _resetMetalFxSpatialOutputState();
+  }
+
+  void _resetMetalFxSpatialOutputState() {
+    _metalFxSpatialResizeTimer?.cancel();
+    _metalFxSpatialResizeTimer = null;
+    _lastMetalFxSpatialOutputSize = null;
+    _metalFxSpatialNativeEnabled = false;
+    _metalFxSpatialUpdateGeneration++;
+  }
+
   SuperResolutionStats? currentSuperResolutionStats() {
     final nvidia = nvidiaRtxVsrStats(
       enabled: _rtxVsrEnabled,
@@ -328,7 +515,7 @@ mixin PlayerMixin {
                     hwdec: 'mediacodec',
                   )
                 : VideoControllerConfiguration(
-                    enableHardwareAcceleration:
+                    enableHardwareAcceleration: _metalFxSpatialEnabled ||
                         AppSettingsController.instance.hardwareDecode.value,
                     androidAttachSurfaceAfterVideoParameters: false,
                   ),
@@ -1008,6 +1195,7 @@ class PlayerController extends BaseController
         WakelockPlus.enable();
         Log.d("Playing");
         scheduleRtxVsrOutputUpdate();
+        scheduleMetalFxSpatialOutputUpdate();
       }
     });
 
@@ -1025,6 +1213,7 @@ class PlayerController extends BaseController
       isVertical.value =
           (player.state.height ?? 9) > (player.state.width ?? 16);
       scheduleRtxVsrOutputUpdate();
+      scheduleMetalFxSpatialOutputUpdate();
     });
     _heightSubscription = player.stream.height.listen((event) {
       Log.d(
@@ -1032,6 +1221,7 @@ class PlayerController extends BaseController
       isVertical.value =
           (player.state.height ?? 9) > (player.state.width ?? 16);
       scheduleRtxVsrOutputUpdate();
+      scheduleMetalFxSpatialOutputUpdate();
     });
   }
 
@@ -1044,6 +1234,7 @@ class PlayerController extends BaseController
     _pipSubscription?.cancel();
     _playingSubscription?.cancel();
     disposeRtxVsrOutput();
+    disposeMetalFxSpatialOutput();
     disposeVideoStatsPolling();
   }
 

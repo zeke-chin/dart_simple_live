@@ -48,6 +48,8 @@ class AppSettingsController extends GetxController {
         .getValue(LocalStorageService.kHardwareDecode, true);
     rtxVsr.value = LocalStorageService.instance
         .getValue(LocalStorageService.kRtxVsr, true);
+    metalFxSpatial.value = LocalStorageService.instance
+        .getValue(LocalStorageService.kMetalFxSpatial, false);
     showPlayerVideoStats.value = LocalStorageService.instance
         .getValue(LocalStorageService.kShowPlayerVideoStats, true);
     chatTextSize.value = LocalStorageService.instance
@@ -158,6 +160,11 @@ class AppSettingsController extends GetxController {
     if (rtxVsr.value && customPlayerOutput.value) {
       rtxVsr.value = false;
       LocalStorageService.instance.setValue(LocalStorageService.kRtxVsr, false);
+    }
+    if (metalFxSpatial.value && customPlayerOutput.value) {
+      metalFxSpatial.value = false;
+      LocalStorageService.instance
+          .setValue(LocalStorageService.kMetalFxSpatial, false);
     }
 
     videoOutputDriver.value = LocalStorageService.instance.getValue(
@@ -295,6 +302,16 @@ class AppSettingsController extends GetxController {
     }
     rtxVsr.value = e;
     LocalStorageService.instance.setValue(LocalStorageService.kRtxVsr, e);
+  }
+
+  var metalFxSpatial = false.obs;
+  void setMetalFxSpatial(bool e) {
+    if (e && customPlayerOutput.value) {
+      setCustomPlayerOutput(false);
+    }
+    metalFxSpatial.value = e;
+    LocalStorageService.instance
+        .setValue(LocalStorageService.kMetalFxSpatial, e);
   }
 
   var showPlayerVideoStats = true.obs;
@@ -582,6 +599,9 @@ class AppSettingsController extends GetxController {
   void setCustomPlayerOutput(bool e) {
     if (e && rtxVsr.value) {
       setRtxVsr(false);
+    }
+    if (e && metalFxSpatial.value) {
+      setMetalFxSpatial(false);
     }
     customPlayerOutput.value = e;
     LocalStorageService.instance

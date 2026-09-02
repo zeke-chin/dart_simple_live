@@ -261,6 +261,11 @@ class LiveRoomPage extends GetView<LiveRoomController> {
           devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
           fit: boxFit,
         );
+        controller.updateMetalFxSpatialViewport(
+          logicalSize: constraints.biggest,
+          devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+          fit: boxFit,
+        );
         return Stack(
           children: [
             Video(
