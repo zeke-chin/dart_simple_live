@@ -801,9 +801,11 @@ packages:
   media_kit:
     dependency: "direct main"
     description:
-      path: "../../media-kit/media_kit"
-      relative: true
-    source: path
+      path: media_kit
+      ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      resolved-ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      url: "https://github.com/zeke-chin/media-kit.git"
+    source: git
     version: "1.2.6"
   media_kit_libs_android_video:
     dependency: transitive
@@ -840,23 +842,29 @@ packages:
   media_kit_libs_video:
     dependency: "direct main"
     description:
-      path: "../../media-kit/libs/universal/media_kit_libs_video"
-      relative: true
-    source: path
+      path: "libs/universal/media_kit_libs_video"
+      ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      resolved-ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      url: "https://github.com/zeke-chin/media-kit.git"
+    source: git
     version: "1.0.8"
   media_kit_libs_windows_video:
     dependency: "direct overridden"
     description:
-      path: "../../media-kit/libs/windows/media_kit_libs_windows_video"
-      relative: true
-    source: path
+      path: "libs/windows/media_kit_libs_windows_video"
+      ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      resolved-ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      url: "https://github.com/zeke-chin/media-kit.git"
+    source: git
     version: "1.0.12"
   media_kit_video:
     dependency: "direct main"
     description:
-      path: "../../media-kit/media_kit_video"
-      relative: true
-    source: path
+      path: media_kit_video
+      ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      resolved-ref: "4008b50d0eaec4a0d9e759d8606d966484a90529"
+      url: "https://github.com/zeke-chin/media-kit.git"
+    source: git
     version: "2.0.1"
   message_pack_dart:
     dependency: transitive
