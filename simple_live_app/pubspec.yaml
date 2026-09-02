@@ -71,15 +71,27 @@ dependencies:
   signalr_netcore: ^1.4.4 #SignalR
 
   # 视频播放
-  media_kit: ^1.2.2
-  media_kit_video: ^2.0.0
-  media_kit_libs_video: ^1.0.7
+  media_kit:
+    path: ../../media-kit/media_kit
+  media_kit_video:
+    path: ../../media-kit/media_kit_video
+  media_kit_libs_video:
+    path: ../../media-kit/libs/universal/media_kit_libs_video
 
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
 
+dependency_overrides:
+  media_kit:
+    path: ../../media-kit/media_kit
+  media_kit_video:
+    path: ../../media-kit/media_kit_video
+  media_kit_libs_windows_video:
+    path: ../../media-kit/libs/windows/media_kit_libs_windows_video
+  media_kit_libs_video:
+    path: ../../media-kit/libs/universal/media_kit_libs_video
 
 dev_dependencies:
   flutter_lints: ^2.0.0
