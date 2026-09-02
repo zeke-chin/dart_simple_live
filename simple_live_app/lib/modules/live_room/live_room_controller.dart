@@ -28,6 +28,7 @@ import 'package:simple_live_app/services/follow_service.dart';
 import 'package:simple_live_app/widgets/desktop_refresh_button.dart';
 import 'package:simple_live_app/widgets/follow_user_item.dart';
 import 'package:simple_live_app/widgets/net_image.dart';
+import 'package:simple_live_app/widgets/settings/settings_switch.dart';
 import 'package:simple_live_core/simple_live_core.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -718,7 +719,7 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
 
   void showPlayerSettingsSheet() {
     Utils.showBottomSheet(
-      title: "画面尺寸",
+      title: "设置",
       child: Obx(
         () => RadioGroup(
           groupValue: AppSettingsController.instance.scaleMode.value,
@@ -728,32 +729,48 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
           },
           child: ListView(
             padding: AppStyle.edgeInsetsV12,
-            children: const [
-              RadioListTile(
+            children: [
+              const RadioListTile(
                 value: 0,
                 title: Text("适应"),
                 visualDensity: VisualDensity.compact,
               ),
-              RadioListTile(
+              const RadioListTile(
                 value: 1,
                 title: Text("拉伸"),
                 visualDensity: VisualDensity.compact,
               ),
-              RadioListTile(
+              const RadioListTile(
                 value: 2,
                 title: Text("铺满"),
                 visualDensity: VisualDensity.compact,
               ),
-              RadioListTile(
+              const RadioListTile(
                 value: 3,
                 title: Text("16:9"),
                 visualDensity: VisualDensity.compact,
               ),
-              RadioListTile(
+              const RadioListTile(
                 value: 4,
                 title: Text("4:3"),
                 visualDensity: VisualDensity.compact,
               ),
+              if (Platform.isWindows) ...[
+                const Divider(),
+                Padding(
+                  padding: AppStyle.edgeInsetsH16,
+                  child: Text(
+                    "画面增强",
+                    style: Get.textTheme.titleMedium,
+                  ),
+                ),
+                SettingsSwitch(
+                  title: "NVIDIA RTX VSR",
+                  subtitle: "当前直播间立即生效",
+                  value: AppSettingsController.instance.rtxVsr.value,
+                  onChanged: setRtxVsrEnabled,
+                ),
+              ],
             ],
           ),
         ),

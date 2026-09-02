@@ -751,6 +751,17 @@ class LiveRoomPage extends GetView<LiveRoomController> {
                 title: "画面尺寸",
                 onTap: controller.showPlayerSettingsSheet,
               ),
+              if (Platform.isWindows) ...[
+                AppStyle.divider,
+                Obx(
+                  () => SettingsSwitch(
+                    title: "NVIDIA RTX VSR",
+                    subtitle: "当前直播间立即生效",
+                    value: AppSettingsController.instance.rtxVsr.value,
+                    onChanged: controller.setRtxVsrEnabled,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
