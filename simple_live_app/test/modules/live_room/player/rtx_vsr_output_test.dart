@@ -46,7 +46,7 @@ void main() {
       expect(output?.height, 1440);
     });
 
-    test('does not downscale sources larger than the viewport', () {
+    test('downscales sources to the window viewport', () {
       final output = calculateRtxVsrOutput(
         sourceWidth: 1920,
         sourceHeight: 1080,
@@ -55,9 +55,23 @@ void main() {
         fit: BoxFit.contain,
       );
 
-      expect(output?.scale, 1.0);
-      expect(output?.width, 1920);
-      expect(output?.height, 1080);
+      expect(output?.scale, 0.6667);
+      expect(output?.width, 1280);
+      expect(output?.height, 720);
+    });
+
+    test('uses the letterboxed window content size when downscaling', () {
+      final output = calculateRtxVsrOutput(
+        sourceWidth: 1920,
+        sourceHeight: 1440,
+        viewportWidth: 1280,
+        viewportHeight: 720,
+        fit: BoxFit.contain,
+      );
+
+      expect(output?.scale, 0.5);
+      expect(output?.width, 960);
+      expect(output?.height, 720);
     });
 
     test('limits upscaling to two times', () {

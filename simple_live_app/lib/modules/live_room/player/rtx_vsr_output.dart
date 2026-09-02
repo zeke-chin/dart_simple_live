@@ -38,8 +38,9 @@ RtxVsrOutput? calculateRtxVsrOutput({
     BoxFit.none => 1.0,
     BoxFit.scaleDown => math.min(1.0, math.min(widthScale, heightScale)),
   };
+  final minimumScale = math.max(2 / sourceWidth, 2 / sourceHeight);
   final scale = double.parse(
-    requestedScale.clamp(1.0, 2.0).toStringAsFixed(4),
+    requestedScale.clamp(minimumScale, 2.0).toStringAsFixed(4),
   );
 
   return RtxVsrOutput(
