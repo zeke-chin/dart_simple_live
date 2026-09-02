@@ -481,16 +481,18 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
       _desktopWindowWasMaximized =
           !_desktopWindowWasFullScreen && await windowManager.isMaximized();
       if (_desktopWindowWasMaximized) {
-        await windowManager.unmaximize();
-        await _waitUntilDesktopWindowRestored();
+        // window_manager 0.5.2 does not switch a maximized window to
+        // frameless before fullscreen. Hidden title-bar mode makes its
+        // WM_NCCALCSIZE handler use the whole monitor client area.
+        await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
       }
       if (!_desktopWindowWasFullScreen) {
         await windowManager.setFullScreen(true);
       }
       fullScreenState.value = true;
     } catch (e) {
-      if (_desktopWindowWasMaximized && !await windowManager.isMaximized()) {
-        await windowManager.maximize();
+      if (_desktopWindowWasMaximized) {
+        await windowManager.setTitleBarStyle(TitleBarStyle.normal);
       }
       _desktopWindowWasFullScreen = false;
       _desktopWindowWasMaximized = false;
@@ -500,17 +502,6 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
       _desktopFullScreenTransitioning = false;
     }
     //danmakuController?.clear();
-  }
-
-  Future<void> _waitUntilDesktopWindowRestored() async {
-    for (var attempt = 0; attempt < 100; attempt++) {
-      if (!await windowManager.isMaximized()) {
-        await Future<void>.delayed(const Duration(milliseconds: 16));
-        return;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-    }
-    throw StateError('Windows 窗口未能在进入直播全屏前退出最大化状态');
   }
 
   /// 退出全屏
@@ -533,6 +524,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
       if (!_desktopWindowWasFullScreen) {
         await windowManager.setFullScreen(false);
         if (_desktopWindowWasMaximized) {
+          await windowManager.setTitleBarStyle(TitleBarStyle.normal);
           await windowManager.maximize();
         }
       }
