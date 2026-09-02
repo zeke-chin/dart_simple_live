@@ -70,21 +70,21 @@ dependencies:
   network_info_plus: ^7.0.0
   signalr_netcore: ^1.4.4 #SignalR
 
-  # 视频播放（Windows D3D11 / RTX VSR 走 zeke-chin/media-kit）
+  # 视频播放（Windows D3D11 / RTX VSR / Apple MetalFX 走 zeke-chin/media-kit）
   media_kit:
     git:
       url: https://github.com/zeke-chin/media-kit.git
-      ref: 4008b50d0eaec4a0d9e759d8606d966484a90529
+      ref: 54135a9b02250d64286e51c4976a08ba1b77dcab
       path: media_kit
   media_kit_video:
     git:
       url: https://github.com/zeke-chin/media-kit.git
-      ref: 4008b50d0eaec4a0d9e759d8606d966484a90529
+      ref: 54135a9b02250d64286e51c4976a08ba1b77dcab
       path: media_kit_video
   media_kit_libs_video:
     git:
       url: https://github.com/zeke-chin/media-kit.git
-      ref: 4008b50d0eaec4a0d9e759d8606d966484a90529
+      ref: 54135a9b02250d64286e51c4976a08ba1b77dcab
       path: libs/universal/media_kit_libs_video
 
   flutter:
@@ -96,22 +96,22 @@ dependency_overrides:
   media_kit:
     git:
       url: https://github.com/zeke-chin/media-kit.git
-      ref: 4008b50d0eaec4a0d9e759d8606d966484a90529
+      ref: 54135a9b02250d64286e51c4976a08ba1b77dcab
       path: media_kit
   media_kit_video:
     git:
       url: https://github.com/zeke-chin/media-kit.git
-      ref: 4008b50d0eaec4a0d9e759d8606d966484a90529
+      ref: 54135a9b02250d64286e51c4976a08ba1b77dcab
       path: media_kit_video
   media_kit_libs_windows_video:
     git:
       url: https://github.com/zeke-chin/media-kit.git
-      ref: 4008b50d0eaec4a0d9e759d8606d966484a90529
+      ref: 54135a9b02250d64286e51c4976a08ba1b77dcab
       path: libs/windows/media_kit_libs_windows_video
   media_kit_libs_video:
     git:
       url: https://github.com/zeke-chin/media-kit.git
-      ref: 4008b50d0eaec4a0d9e759d8606d966484a90529
+      ref: 54135a9b02250d64286e51c4976a08ba1b77dcab
       path: libs/universal/media_kit_libs_video
 
 dev_dependencies:
