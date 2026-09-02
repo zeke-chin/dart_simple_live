@@ -242,7 +242,7 @@ feat(ios): 接入 MetalFX Spatial 视频输出
 - 对比 bilinear、mpv 高质量 scaler、MetalFX Spatial。
 - 记录 720p、1080p、窗口、内屏全屏、外接 4K 的耗时和掉帧。
 - 连续播放至少 10 分钟，观察温度、功耗和内存。
-- App 依赖恢复为带 commit ref 的 git 依赖。
+- 真正发版前先推送 media-kit，再把 App 依赖恢复为带 commit ref 的 git 依赖；本地开发阶段按约定保留相对路径。
 - 完整执行 `fvm flutter analyze` 与相关测试。
 
 建议提交：
@@ -268,3 +268,43 @@ iPadOS 后续通过条件：
 2. 输出尺寸按实际 Retina 视频区域计算。
 3. 横竖屏、分屏、前后台切换不会保留错误尺寸或旧帧。
 4. 连续播放温度、内存和电量消耗可接受。
+
+## 11. 当前实施状态（2026-09-03）
+
+已完成：
+
+- media-kit 新增 `isMetalFxSpatialSupported` 与 `setMetalFxSpatial` Dart API。
+- Darwin MethodChannel、设备能力查询和安全 no-op 已接通。
+- macOS OpenGL → MetalFX private texture → GPU blit → Flutter PixelBuffer 已实现。
+- iPadOS OpenGL ES 路径已接线；模拟器明确返回不支持。
+- App 已加入默认关闭的设置项、直播间即时开关、Retina viewport 计算和 200ms debounce。
+- MetalFX 与自定义播放器输出互斥；不支持的设备会自动关闭开关。
+- Flutter raster 线程与渲染 worker 切换 processor 时已有单独引用锁。
+
+本机验证：
+
+- M3 Max 上 `MTLFXSpatialScalerDescriptor.supportsDevice == true`。
+- Metal Validation 下，独立 `1920×1080 → 3840×2160` private texture + GPU blit 成功，单帧 GPU 时间约 4.37ms。这个数字只代表合成探针，不包含 libmpv、`glFinish`、Flutter 合成和直播解码。
+- macOS 集成测试完成 `1280×720 → 1920×1080 → 1280×720` 开关循环。
+- macOS 集成测试完成 `1920×1080 → 3024×1701 → 1920×1080` Retina 内屏目标循环。
+- macOS 集成测试完成 `1920×1080 → 3840×2160 → 1920×1080` 外接 4K 目标循环。
+- 三次集成测试均持续处理多帧并验证 Texture rect 恢复。
+- `otool` 已确认 macOS 与 iOS 产物都以 `LC_LOAD_WEAK_DYLIB` 加载 MetalFX，不会因最低部署版本早于 MetalFX 而在旧系统启动阶段强制加载框架。
+
+已通过命令：
+
+```bash
+fvm flutter analyze
+fvm flutter test <除历史 test/widget_test.dart 外的全部测试>
+fvm flutter test integration_test/metal_fx_spatial_smoke_test.dart -d macos
+fvm flutter build macos --debug
+fvm flutter build ios --simulator --debug
+fvm flutter build ios --debug --no-codesign
+```
+
+测试基线说明：
+
+- `test/widget_test.dart` 是 Flutter 模板遗留的计数器测试，当前 `MyApp` 已要求提前注册 `AppSettingsController`，因此它在本功能之前就不能独立运行。除该历史测试外的 40 项 App 测试全部通过。
+- iPad 真机当前显示为 unavailable，现阶段只有 device SDK 编译验证，不能把模拟器或 macOS GPU 结果当作 iPad 真机性能结论。
+- 尚未完成真实低码率直播的画质 A/B、10 分钟温度/功耗测试和物理 iPad 验收。
+- media-kit 本地分支尚未推送，因此 App 继续使用 `../../media-kit` 相对依赖；发版前才能切换到新的远端 commit ref。
