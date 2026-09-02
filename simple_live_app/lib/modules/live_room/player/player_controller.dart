@@ -482,15 +482,35 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
           !_desktopWindowWasFullScreen && await windowManager.isMaximized();
       if (_desktopWindowWasMaximized) {
         await windowManager.unmaximize();
+        await _waitUntilDesktopWindowRestored();
       }
       if (!_desktopWindowWasFullScreen) {
         await windowManager.setFullScreen(true);
       }
       fullScreenState.value = true;
+    } catch (e) {
+      if (_desktopWindowWasMaximized && !await windowManager.isMaximized()) {
+        await windowManager.maximize();
+      }
+      _desktopWindowWasFullScreen = false;
+      _desktopWindowWasMaximized = false;
+      Log.w('进入直播全屏失败：$e');
+      SmartDialog.showToast('进入直播全屏失败');
     } finally {
       _desktopFullScreenTransitioning = false;
     }
     //danmakuController?.clear();
+  }
+
+  Future<void> _waitUntilDesktopWindowRestored() async {
+    for (var attempt = 0; attempt < 100; attempt++) {
+      if (!await windowManager.isMaximized()) {
+        await Future<void>.delayed(const Duration(milliseconds: 16));
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    throw StateError('Windows 窗口未能在进入直播全屏前退出最大化状态');
   }
 
   /// 退出全屏
