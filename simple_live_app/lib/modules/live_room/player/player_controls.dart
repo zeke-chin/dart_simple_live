@@ -10,6 +10,7 @@ import 'package:simple_live_app/app/controller/app_settings_controller.dart';
 import 'package:simple_live_app/app/sites.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/modules/live_room/live_room_controller.dart';
+import 'package:simple_live_app/modules/live_room/player/player_video_stats_overlay.dart';
 import 'package:simple_live_app/modules/settings/danmu_settings_page.dart';
 import 'package:simple_live_app/services/db_service.dart';
 import 'package:simple_live_app/services/follow_service.dart';
@@ -396,6 +397,10 @@ Widget buildFullControls(
             ),
           ),
         ),
+        PlayerVideoStatsOverlay(
+          stats: controller.videoStats,
+          padding: padding,
+        ),
       ],
     ),
   );
@@ -644,6 +649,7 @@ Widget buildControls(
           ),
         ),
       ),
+      PlayerVideoStatsOverlay(stats: controller.videoStats),
     ],
   );
 }
@@ -842,22 +848,27 @@ void showPlayerSettings(LiveRoomController controller) {
               title: Text("4:3"),
               visualDensity: VisualDensity.compact,
             ),
-            if (Platform.isWindows) ...[
-              const Divider(),
-              Padding(
-                padding: AppStyle.edgeInsetsH16,
-                child: Text(
-                  "画面增强",
-                  style: Get.textTheme.titleMedium,
-                ),
+            const Divider(),
+            Padding(
+              padding: AppStyle.edgeInsetsH16,
+              child: Text(
+                "画面增强",
+                style: Get.textTheme.titleMedium,
               ),
+            ),
+            if (Platform.isWindows)
               SettingsSwitch(
                 title: "NVIDIA RTX VSR",
                 subtitle: "当前直播间立即生效",
                 value: AppSettingsController.instance.rtxVsr.value,
                 onChanged: controller.setRtxVsrEnabled,
               ),
-            ],
+            SettingsSwitch(
+              title: "显示播放信息",
+              subtitle: "在画面上显示分辨率、码率和超分状态",
+              value: AppSettingsController.instance.showPlayerVideoStats.value,
+              onChanged: AppSettingsController.instance.setShowPlayerVideoStats,
+            ),
           ],
         ),
       ),

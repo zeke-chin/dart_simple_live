@@ -48,6 +48,8 @@ class AppSettingsController extends GetxController {
         .getValue(LocalStorageService.kHardwareDecode, true);
     rtxVsr.value = LocalStorageService.instance
         .getValue(LocalStorageService.kRtxVsr, true);
+    showPlayerVideoStats.value = LocalStorageService.instance
+        .getValue(LocalStorageService.kShowPlayerVideoStats, true);
     chatTextSize.value = LocalStorageService.instance
         .getValue(LocalStorageService.kChatTextSize, 14.0);
 
@@ -293,6 +295,13 @@ class AppSettingsController extends GetxController {
     }
     rtxVsr.value = e;
     LocalStorageService.instance.setValue(LocalStorageService.kRtxVsr, e);
+  }
+
+  var showPlayerVideoStats = true.obs;
+  void setShowPlayerVideoStats(bool e) {
+    showPlayerVideoStats.value = e;
+    LocalStorageService.instance
+        .setValue(LocalStorageService.kShowPlayerVideoStats, e);
   }
 
   var chatTextSize = 14.0.obs;

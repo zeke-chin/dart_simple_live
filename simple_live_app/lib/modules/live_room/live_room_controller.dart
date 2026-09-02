@@ -755,22 +755,28 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
                 title: Text("4:3"),
                 visualDensity: VisualDensity.compact,
               ),
-              if (Platform.isWindows) ...[
-                const Divider(),
-                Padding(
-                  padding: AppStyle.edgeInsetsH16,
-                  child: Text(
-                    "画面增强",
-                    style: Get.textTheme.titleMedium,
-                  ),
+              const Divider(),
+              Padding(
+                padding: AppStyle.edgeInsetsH16,
+                child: Text(
+                  "画面增强",
+                  style: Get.textTheme.titleMedium,
                 ),
+              ),
+              if (Platform.isWindows)
                 SettingsSwitch(
                   title: "NVIDIA RTX VSR",
                   subtitle: "当前直播间立即生效",
                   value: AppSettingsController.instance.rtxVsr.value,
                   onChanged: setRtxVsrEnabled,
                 ),
-              ],
+              SettingsSwitch(
+                title: "显示播放信息",
+                subtitle: "在画面上显示分辨率、码率和超分状态",
+                value: AppSettingsController.instance.showPlayerVideoStats.value,
+                onChanged:
+                    AppSettingsController.instance.setShowPlayerVideoStats,
+              ),
             ],
           ),
         ),

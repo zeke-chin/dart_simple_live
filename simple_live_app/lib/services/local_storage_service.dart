@@ -77,6 +77,9 @@ class LocalStorageService extends GetxService {
   /// NVIDIA RTX 视频超分辨率
   static const String kRtxVsr = "RtxVsr";
 
+  /// 在播放器画面上显示分辨率、码率和超分状态
+  static const String kShowPlayerVideoStats = "ShowPlayerVideoStats";
+
   /// 聊天区文字大小
   static const String kChatTextSize = "ChatTextSize";
 

@@ -53,6 +53,15 @@ class PlaySettingsPage extends GetView<AppSettingsController> {
                       onChanged: controller.setRtxVsr,
                     ),
                   ),
+                AppStyle.divider,
+                Obx(
+                  () => SettingsSwitch(
+                    title: "显示播放信息",
+                    subtitle: "在画面上显示分辨率、码率和超分状态",
+                    value: controller.showPlayerVideoStats.value,
+                    onChanged: controller.setShowPlayerVideoStats,
+                  ),
+                ),
                 if (Platform.isAndroid) AppStyle.divider,
                 Obx(
                   () => Visibility(

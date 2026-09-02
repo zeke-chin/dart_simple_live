@@ -762,6 +762,17 @@ class LiveRoomPage extends GetView<LiveRoomController> {
                   ),
                 ),
               ],
+              AppStyle.divider,
+              Obx(
+                () => SettingsSwitch(
+                  title: "显示播放信息",
+                  subtitle: "在画面上显示分辨率、码率和超分状态",
+                  value:
+                      AppSettingsController.instance.showPlayerVideoStats.value,
+                  onChanged:
+                      AppSettingsController.instance.setShowPlayerVideoStats,
+                ),
+              ),
             ],
           ),
         ),

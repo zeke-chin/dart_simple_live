@@ -19,6 +19,7 @@ import 'package:simple_live_app/app/controller/base_controller.dart';
 import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
+import 'package:simple_live_app/modules/live_room/player/player_video_stats.dart';
 import 'package:simple_live_app/modules/live_room/player/rtx_vsr_output.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
@@ -37,7 +38,11 @@ mixin PlayerMixin {
   BoxFit _rtxVsrFit = BoxFit.contain;
   String? _lastRtxVsrFilter;
   Size? _lastRtxVsrOutputSize;
+  RtxVsrOutput? _lastRtxVsrOutput;
   int _rtxVsrUpdateGeneration = 0;
+  Timer? _videoStatsTimer;
+  bool _videoStatsRefreshing = false;
+  final videoStats = Rxn<PlayerVideoStats>();
 
   bool get _rtxVsrEnabled =>
       Platform.isWindows && AppSettingsController.instance.rtxVsr.value;
@@ -195,6 +200,7 @@ mixin PlayerMixin {
         );
         _lastRtxVsrOutputSize = outputSize;
       }
+      _lastRtxVsrOutput = output;
       Log.d(
         'RTX VSR: source=${sourceWidth}x$sourceHeight, '
         'viewport=${viewportSize.width.toInt()}x${viewportSize.height.toInt()}, '
@@ -216,7 +222,79 @@ mixin PlayerMixin {
     _rtxVsrResizeTimer = null;
     _lastRtxVsrFilter = null;
     _lastRtxVsrOutputSize = null;
+    _lastRtxVsrOutput = null;
     _rtxVsrUpdateGeneration++;
+  }
+
+  SuperResolutionStats? currentSuperResolutionStats() {
+    final nvidia = nvidiaRtxVsrStats(
+      enabled: _rtxVsrEnabled,
+      outputWidth: _lastRtxVsrOutput?.width,
+      outputHeight: _lastRtxVsrOutput?.height,
+      scale: _lastRtxVsrOutput?.scale,
+    );
+    if (nvidia != null) {
+      return nvidia;
+    }
+    // Apple VT 超分接入后在此读取 native 输出尺寸和 process 耗时。
+    return appleVtSrStats();
+  }
+
+  void startVideoStatsPolling() {
+    _videoStatsTimer?.cancel();
+    _videoStatsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      unawaited(_refreshVideoStats());
+    });
+    unawaited(_refreshVideoStats());
+  }
+
+  void disposeVideoStatsPolling() {
+    _videoStatsTimer?.cancel();
+    _videoStatsTimer = null;
+    videoStats.value = null;
+  }
+
+  Future<void> _refreshVideoStats() async {
+    if (_videoStatsRefreshing) {
+      return;
+    }
+    if (!AppSettingsController.instance.showPlayerVideoStats.value) {
+      if (videoStats.value != null) {
+        videoStats.value = null;
+      }
+      return;
+    }
+    if (player.platform is! NativePlayer) {
+      return;
+    }
+
+    _videoStatsRefreshing = true;
+    try {
+      final pp = player.platform as NativePlayer;
+      final values = await Future.wait([
+        pp.getProperty('video-dec-params/w'),
+        pp.getProperty('video-dec-params/h'),
+        pp.getProperty('packet-video-bitrate'),
+        pp.getProperty('video-bitrate'),
+        pp.getProperty('estimated-vf-fps'),
+        pp.getProperty('container-fps'),
+        pp.getProperty('hwdec-current'),
+      ]);
+      videoStats.value = playerVideoStatsFromMpv(
+        decWidth: values[0],
+        decHeight: values[1],
+        packetBitrate: values[2],
+        videoBitrate: values[3],
+        estimatedFps: values[4],
+        containerFps: values[5],
+        hwdec: values[6],
+        superResolution: currentSuperResolutionStats(),
+      );
+    } catch (e) {
+      Log.d('刷新播放信息失败：$e');
+    } finally {
+      _videoStatsRefreshing = false;
+    }
   }
 
   String _buildRtxVsrFilter(RtxVsrOutput output) {
@@ -900,6 +978,7 @@ class PlayerController extends BaseController
   void onInit() {
     initSystem();
     initStream();
+    startVideoStatsPolling();
     //设置音量
     player.setVolume(AppSettingsController.instance.playerVolume.value);
     super.onInit();
@@ -965,6 +1044,7 @@ class PlayerController extends BaseController
     _pipSubscription?.cancel();
     _playingSubscription?.cancel();
     disposeRtxVsrOutput();
+    disposeVideoStatsPolling();
   }
 
   void mediaEnd() {
