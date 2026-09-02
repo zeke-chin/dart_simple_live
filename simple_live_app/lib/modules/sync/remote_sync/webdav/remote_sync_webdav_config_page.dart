@@ -51,7 +51,7 @@ class _RemoteSyncWebDAVConfigPageState
                 content: [
                   const Text("此功能可以将您的数据备份到 WebDAV 服务器中或者进行数据恢复.\n"),
                   const Text(
-                      "WebDAV 服务器地址请以 http:// 或 https:// 开头，如坚果云(点击复制)："),
+                      "WebDAV 服务器地址请以 http:// 或 https:// 开头，并带上备份路径，如坚果云(点击复制)："),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: InkWell(
@@ -80,7 +80,8 @@ class _RemoteSyncWebDAVConfigPageState
                   NoneBorderCircularTextField(
                     editingController: _urlController,
                     labelText: "WebDAV服务器地址",
-                    hintText: "请以http:// 或 http:// 开头",
+                    hintText: "请以 http:// 或 https:// 开头，并带上备份路径",
+                    helperText: "地址需带上备份路径，不要只填到服务器根地址",
                     prefixIcon: const Icon(Icons.public),
                     trailing: InkWell(
                       child: const Icon(
