@@ -47,7 +47,7 @@ class RemoteSyncWebDAVPage extends GetView<RemoteSyncWebDAVController> {
                         AppStyle.divider,
                         ListTile(
                           title: const Text("上传到云端"),
-                          subtitle: Text("上次上传：${controller.lastUploadTime}"),
+                          subtitle: Text("上次上传：${controller.lastUploadTime.value}"),
                           leading: const Icon(Icons.cloud_upload_outlined),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () {
@@ -57,7 +57,7 @@ class RemoteSyncWebDAVPage extends GetView<RemoteSyncWebDAVController> {
                         AppStyle.divider,
                         ListTile(
                           title: const Text("恢复到本地"),
-                          subtitle: Text("上次恢复：${controller.lastRecoverTime}"),
+                          subtitle: Text("上次恢复：${controller.lastRecoverTime.value}"),
                           leading: const Icon(Icons.cloud_download_outlined),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
