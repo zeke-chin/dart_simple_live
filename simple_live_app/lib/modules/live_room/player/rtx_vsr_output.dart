@@ -3,11 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/painting.dart';
 
 class RtxVsrOutput {
+  final double? preScale;
   final double scale;
   final int width;
   final int height;
 
   const RtxVsrOutput({
+    this.preScale,
     required this.scale,
     required this.width,
     required this.height,
@@ -42,6 +44,22 @@ RtxVsrOutput? calculateRtxVsrOutput({
   final scale = double.parse(
     requestedScale.clamp(minimumScale, 2.0).toStringAsFixed(4),
   );
+
+  if (scale <= 1.0) {
+    const windowVsrScale = 1.1;
+    final preScale = double.parse(
+      (scale / windowVsrScale).toStringAsFixed(4),
+    );
+    final preWidth = _scaledEvenDimension(sourceWidth, preScale);
+    final preHeight = _scaledEvenDimension(sourceHeight, preScale);
+
+    return RtxVsrOutput(
+      preScale: preScale,
+      scale: windowVsrScale,
+      width: _scaledEvenDimension(preWidth, windowVsrScale),
+      height: _scaledEvenDimension(preHeight, windowVsrScale),
+    );
+  }
 
   return RtxVsrOutput(
     scale: scale,

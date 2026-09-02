@@ -26,6 +26,8 @@ import 'package:window_manager/window_manager.dart';
 mixin PlayerMixin {
   static const _rtxVsrFilterPrefix =
       'd3d11vpp=format=nv12:scaling-mode=nvidia:scale=';
+  static const _rtxVsrPreScaleFilterPrefix =
+      'd3d11vpp=format=nv12:scaling-mode=standard:scale=';
 
   GlobalKey<VideoState> globalPlayerKey = GlobalKey<VideoState>();
   GlobalKey globalDanmuKey = GlobalKey();
@@ -175,7 +177,7 @@ mixin PlayerMixin {
         return;
       }
 
-      final filter = '$_rtxVsrFilterPrefix${output.scale.toStringAsFixed(4)}';
+      final filter = _buildRtxVsrFilter(output);
       final outputSize =
           Size(output.width.toDouble(), output.height.toDouble());
       if (_lastRtxVsrFilter == filter && _lastRtxVsrOutputSize == outputSize) {
@@ -196,7 +198,8 @@ mixin PlayerMixin {
       Log.d(
         'RTX VSR: source=${sourceWidth}x$sourceHeight, '
         'viewport=${viewportSize.width.toInt()}x${viewportSize.height.toInt()}, '
-        'scale=${output.scale.toStringAsFixed(4)}, '
+        'preScale=${output.preScale?.toStringAsFixed(4) ?? '-'}, '
+        'vsrScale=${output.scale.toStringAsFixed(4)}, '
         'output=${output.width}x${output.height}',
       );
     } catch (e) {
@@ -214,6 +217,16 @@ mixin PlayerMixin {
     _lastRtxVsrFilter = null;
     _lastRtxVsrOutputSize = null;
     _rtxVsrUpdateGeneration++;
+  }
+
+  String _buildRtxVsrFilter(RtxVsrOutput output) {
+    final vsrFilter = '$_rtxVsrFilterPrefix${output.scale.toStringAsFixed(4)}';
+    final preScale = output.preScale;
+    if (preScale == null) {
+      return vsrFilter;
+    }
+    return '$_rtxVsrPreScaleFilterPrefix${preScale.toStringAsFixed(4)},'
+        '$vsrFilter';
   }
 
   /// 视频控制器

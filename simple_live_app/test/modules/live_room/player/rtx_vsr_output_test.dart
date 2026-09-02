@@ -14,6 +14,7 @@ void main() {
       );
 
       expect(output?.scale, 1.3333);
+      expect(output?.preScale, isNull);
       expect(output?.width, 1280);
       expect(output?.height, 720);
     });
@@ -55,7 +56,8 @@ void main() {
         fit: BoxFit.contain,
       );
 
-      expect(output?.scale, 0.6667);
+      expect(output?.preScale, 0.6061);
+      expect(output?.scale, 1.1);
       expect(output?.width, 1280);
       expect(output?.height, 720);
     });
@@ -69,9 +71,25 @@ void main() {
         fit: BoxFit.contain,
       );
 
-      expect(output?.scale, 0.5);
+      expect(output?.preScale, 0.4545);
+      expect(output?.scale, 1.1);
       expect(output?.width, 960);
       expect(output?.height, 720);
+    });
+
+    test('forces an NVIDIA upscale when source and viewport sizes match', () {
+      final output = calculateRtxVsrOutput(
+        sourceWidth: 1920,
+        sourceHeight: 1080,
+        viewportWidth: 1920,
+        viewportHeight: 1080,
+        fit: BoxFit.contain,
+      );
+
+      expect(output?.preScale, 0.9091);
+      expect(output?.scale, 1.1);
+      expect(output?.width, 1920);
+      expect(output?.height, 1080);
     });
 
     test('limits upscaling to two times', () {
