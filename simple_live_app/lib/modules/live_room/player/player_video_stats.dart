@@ -1,3 +1,5 @@
+import 'package:simple_live_app/modules/live_room/player/player_resource_usage.dart';
+
 /// 超分后端。Windows 使用 RTX VSR；Apple 平台使用 MetalFX Spatial。
 enum SuperResolutionBackend {
   nvidiaRtxVsr,
@@ -40,6 +42,7 @@ class PlayerVideoStats {
   final double? fps;
   final String? hwdec;
   final SuperResolutionStats? superResolution;
+  final PlayerResourceUsage? resourceUsage;
 
   const PlayerVideoStats({
     this.sourceWidth,
@@ -48,6 +51,7 @@ class PlayerVideoStats {
     this.fps,
     this.hwdec,
     this.superResolution,
+    this.resourceUsage,
   });
 
   bool get hasSource => (sourceWidth ?? 0) > 0 && (sourceHeight ?? 0) > 0;
@@ -94,6 +98,10 @@ class PlayerVideoStats {
     }
     return parts.join('   ');
   }
+
+  String? get resourceUsageLabel => resourceUsage == null ? null : 'RES';
+
+  String? get resourceUsageValues => resourceUsage?.values;
 }
 
 int? parseMpInt(String raw) {
@@ -207,6 +215,7 @@ PlayerVideoStats playerVideoStatsFromMpv({
   required String containerFps,
   required String hwdec,
   SuperResolutionStats? superResolution,
+  PlayerResourceUsage? resourceUsage,
 }) {
   return PlayerVideoStats(
     sourceWidth: parseMpInt(decWidth),
@@ -215,5 +224,6 @@ PlayerVideoStats playerVideoStatsFromMpv({
     fps: parseMpDouble(estimatedFps) ?? parseMpDouble(containerFps),
     hwdec: hwdec.trim().isEmpty ? null : hwdec.trim(),
     superResolution: superResolution,
+    resourceUsage: resourceUsage,
   );
 }

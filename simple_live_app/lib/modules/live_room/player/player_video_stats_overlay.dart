@@ -25,6 +25,8 @@ class PlayerVideoStatsOverlay extends StatelessWidget {
       }
       final srLabel = value.superResolutionLabel;
       final srValues = value.superResolutionValues;
+      final resourceLabel = value.resourceUsageLabel;
+      final resourceValues = value.resourceUsageValues;
       return Positioned(
         left: padding.left + 12,
         top: padding.top + 12,
@@ -51,6 +53,8 @@ class PlayerVideoStatsOverlay extends StatelessWidget {
                   defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                   children: [
                     _statsRow(value.sourceLabel, value.sourceValues),
+                    if (resourceLabel != null && resourceValues != null)
+                      _statsRow(resourceLabel, resourceValues),
                     if (srLabel != null && srValues != null)
                       _statsRow(srLabel, srValues),
                   ],

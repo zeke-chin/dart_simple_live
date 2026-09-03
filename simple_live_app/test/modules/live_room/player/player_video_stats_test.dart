@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:simple_live_app/modules/live_room/player/player_resource_usage.dart';
 import 'package:simple_live_app/modules/live_room/player/player_video_stats.dart';
 
 void main() {
@@ -122,6 +123,27 @@ void main() {
       expect(
         stats.superResolutionValues,
         '2560×1440   MetalFX Spatial   2.00×',
+      );
+    });
+
+    test('resource usage is shown on a separate line', () {
+      const stats = PlayerVideoStats(
+        sourceWidth: 1920,
+        sourceHeight: 1080,
+        resourceUsage: PlayerResourceUsage(
+          cpuPercent: 42.5,
+          metalFxGpuPercent: 6.2,
+          memoryBytes: 512 * 1024 * 1024,
+          downloadBytesPerSecond: 5 * 1024 * 1024,
+          uploadBytesPerSecond: 100 * 1024,
+        ),
+      );
+
+      expect(stats.resourceUsageLabel, 'RES');
+      expect(
+        stats.resourceUsageValues,
+        'CPU 42.5%   MFX GPU 6.2%   MEM 512 MB   '
+        'NET ↓5.0 MB/s ↑100 KB/s',
       );
     });
   });

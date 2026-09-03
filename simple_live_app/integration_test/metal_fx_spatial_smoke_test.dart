@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:simple_live_app/modules/live_room/player/player_resource_usage.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -86,6 +87,22 @@ void main() {
       // Keep enough frames flowing to exercise buffer reuse and metrics.
       await tester.pump(const Duration(seconds: 5));
       expect(player.state.playing, isTrue);
+
+      final metrics = await controller.getMetalFxSpatialMetrics();
+      expect(metrics, isNotNull);
+      expect(metrics!.processedFrames, greaterThan(0));
+      expect(metrics.totalGpuMilliseconds, greaterThan(0));
+
+      final resourceSampler = PlayerResourceUsageSampler();
+      await resourceSampler.sample(controller);
+      await tester.pump(const Duration(seconds: 1));
+      final resourceUsage = await resourceSampler.sample(controller);
+      expect(resourceUsage, isNotNull);
+      expect(resourceUsage!.cpuPercent, isNotNull);
+      expect(resourceUsage.memoryBytes, greaterThan(0));
+      expect(resourceUsage.downloadBytesPerSecond, isNotNull);
+      expect(resourceUsage.uploadBytesPerSecond, isNotNull);
+      expect(resourceUsage.metalFxGpuPercent, isNotNull);
 
       await controller.setMetalFxSpatial(enabled: false);
       await _waitForTextureSize(

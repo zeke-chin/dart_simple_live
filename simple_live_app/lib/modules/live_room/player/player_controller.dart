@@ -20,6 +20,7 @@ import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/modules/live_room/player/metal_fx_spatial_output.dart';
+import 'package:simple_live_app/modules/live_room/player/player_resource_usage.dart';
 import 'package:simple_live_app/modules/live_room/player/player_video_stats.dart';
 import 'package:simple_live_app/modules/live_room/player/rtx_vsr_output.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -44,6 +45,7 @@ mixin PlayerMixin {
   Timer? _videoStatsTimer;
   bool _videoStatsRefreshing = false;
   final videoStats = Rxn<PlayerVideoStats>();
+  final _resourceUsageSampler = PlayerResourceUsageSampler();
 
   Timer? _metalFxSpatialResizeTimer;
   Size? _metalFxSpatialViewportSize;
@@ -449,6 +451,7 @@ mixin PlayerMixin {
     _videoStatsTimer?.cancel();
     _videoStatsTimer = null;
     videoStats.value = null;
+    _resourceUsageSampler.reset();
   }
 
   Future<void> _refreshVideoStats() async {
@@ -467,6 +470,7 @@ mixin PlayerMixin {
 
     _videoStatsRefreshing = true;
     try {
+      final resourceUsageFuture = _resourceUsageSampler.sample(videoController);
       final pp = player.platform as NativePlayer;
       final values = await Future.wait([
         pp.getProperty('video-dec-params/w'),
@@ -477,6 +481,7 @@ mixin PlayerMixin {
         pp.getProperty('container-fps'),
         pp.getProperty('hwdec-current'),
       ]);
+      final resourceUsage = await resourceUsageFuture;
       videoStats.value = playerVideoStatsFromMpv(
         decWidth: values[0],
         decHeight: values[1],
@@ -486,6 +491,7 @@ mixin PlayerMixin {
         containerFps: values[5],
         hwdec: values[6],
         superResolution: currentSuperResolutionStats(),
+        resourceUsage: resourceUsage,
       );
     } catch (e) {
       Log.d('刷新播放信息失败：$e');
