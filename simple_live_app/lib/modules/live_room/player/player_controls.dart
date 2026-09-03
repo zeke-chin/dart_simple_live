@@ -6,10 +6,12 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:remixicon/remixicon.dart';
 import 'package:simple_live_app/app/app_style.dart';
+import 'package:simple_live_app/app/apple_safe_area.dart';
 import 'package:simple_live_app/app/controller/app_settings_controller.dart';
 import 'package:simple_live_app/app/sites.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/modules/live_room/live_room_controller.dart';
+import 'package:simple_live_app/modules/live_room/player/player_safe_area.dart';
 import 'package:simple_live_app/modules/live_room/player/player_video_stats_overlay.dart';
 import 'package:simple_live_app/modules/settings/danmu_settings_page.dart';
 import 'package:simple_live_app/services/db_service.dart';
@@ -27,26 +29,34 @@ Widget playerControls(
   VideoState videoState,
   LiveRoomController controller,
 ) {
-  return Obx(() {
-    if (controller.fullScreenState.value) {
-      return buildFullControls(
+  return AppleSafeAreaBuilder(
+    builder: (_, nativeInsets) => Obx(() {
+      if (controller.fullScreenState.value) {
+        return buildFullControls(
+          videoState,
+          controller,
+          nativeInsets: nativeInsets,
+        );
+      }
+      return buildControls(
+        videoState.context.orientation == Orientation.portrait,
         videoState,
         controller,
       );
-    }
-    return buildControls(
-      videoState.context.orientation == Orientation.portrait,
-      videoState,
-      controller,
-    );
-  });
+    }),
+  );
 }
 
 Widget buildFullControls(
   VideoState videoState,
-  LiveRoomController controller,
-) {
-  var padding = MediaQuery.of(videoState.context).padding;
+  LiveRoomController controller, {
+  EdgeInsets? nativeInsets,
+}) {
+  final safePadding = resolvePlayerSafeAreaPadding(
+    MediaQuery.of(videoState.context),
+    fullScreen: true,
+    nativeInsets: nativeInsets,
+  );
   GlobalKey volumeButtonkey = GlobalKey();
   return DragToMoveArea(
     child: Stack(
@@ -61,8 +71,8 @@ Widget buildFullControls(
                 ((!Platform.isAndroid && !Platform.isIOS) ||
                     controller.fullScreenState.value),
             child: Positioned(
-              left: 24,
-              bottom: 24,
+              left: safePadding.left + 24,
+              bottom: safePadding.bottom + 24,
               child: PlayerSuperChatOverlay(controller: controller),
             ),
           ),
@@ -125,14 +135,14 @@ Widget buildFullControls(
             top: (controller.showControlsState.value &&
                     !controller.lockControlsState.value)
                 ? 0
-                : -(48 + padding.top),
+                : -(48 + safePadding.top),
             duration: const Duration(milliseconds: 200),
             child: Container(
-              height: 48 + padding.top,
+              height: 48 + safePadding.top,
               padding: EdgeInsets.only(
-                left: padding.left + 12,
-                right: padding.right + 12,
-                top: padding.top,
+                left: safePadding.left + 12,
+                right: safePadding.right + 12,
+                top: safePadding.top,
               ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -226,7 +236,7 @@ Widget buildFullControls(
             bottom: (controller.showControlsState.value &&
                     !controller.lockControlsState.value)
                 ? 0
-                : -(80 + padding.bottom),
+                : -(80 + safePadding.bottom),
             duration: const Duration(milliseconds: 200),
             child: Container(
               decoration: const BoxDecoration(
@@ -240,9 +250,9 @@ Widget buildFullControls(
                 ),
               ),
               padding: EdgeInsets.only(
-                left: padding.left + 12,
-                right: padding.right + 12,
-                bottom: padding.bottom,
+                left: safePadding.left + 12,
+                right: safePadding.right + 12,
+                bottom: safePadding.bottom,
               ),
               child: Row(
                 children: [
@@ -361,8 +371,8 @@ Widget buildFullControls(
             top: 0,
             bottom: 0,
             right: controller.showControlsState.value
-                ? padding.right + 12
-                : -(64 + padding.right),
+                ? safePadding.right + 12
+                : -(64 + safePadding.right),
             duration: const Duration(milliseconds: 200),
             child: buildLockButton(controller),
           ),
@@ -373,8 +383,8 @@ Widget buildFullControls(
             top: 0,
             bottom: 0,
             left: controller.showControlsState.value
-                ? padding.left + 12
-                : -(64 + padding.right),
+                ? safePadding.left + 12
+                : -(64 + safePadding.left),
             duration: const Duration(milliseconds: 200),
             child: buildLockButton(controller),
           ),
@@ -399,7 +409,7 @@ Widget buildFullControls(
         ),
         PlayerVideoStatsOverlay(
           stats: controller.videoStats,
-          padding: padding,
+          padding: safePadding,
         ),
       ],
     ),
@@ -655,7 +665,10 @@ Widget buildControls(
 }
 
 Widget buildDanmuView(VideoState videoState, LiveRoomController controller) {
-  var padding = MediaQuery.of(videoState.context).padding;
+  final safePadding = resolvePlayerSafeAreaPadding(
+    MediaQuery.of(videoState.context),
+    fullScreen: controller.fullScreenState.value,
+  );
   controller.danmakuView ??= DanmakuScreen(
     key: controller.globalDanmuKey,
     createdController: controller.initDanmakuController,
@@ -669,8 +682,10 @@ Widget buildDanmuView(VideoState videoState, LiveRoomController controller) {
     ),
   );
   return Positioned.fill(
-    top: padding.top,
-    bottom: padding.bottom,
+    left: safePadding.left,
+    top: safePadding.top,
+    right: safePadding.right,
+    bottom: safePadding.bottom,
     child: Obx(
       () => Offstage(
         offstage: !controller.showDanmakuState.value,

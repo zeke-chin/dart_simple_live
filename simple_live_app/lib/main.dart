@@ -12,6 +12,7 @@ import 'package:logger/logger.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:simple_live_app/app/apple_safe_area.dart';
 import 'package:simple_live_app/app/app_style.dart';
 import 'package:simple_live_app/app/controller/app_settings_controller.dart';
 import 'package:simple_live_app/app/log.dart';
@@ -223,92 +224,84 @@ class MyApp extends StatelessWidget {
           loadingBuilder: ((msg) => const AppLoaddingWidget()),
           //字体大小不跟随系统变化
           builder: (context, child) {
-            // Fix for HyperOS windowed-mode Flutter bug:
-            // - Values > 50 indicate the bug (windowed mode on HyperOS)
-            // - Values == 0 are valid for fullscreen/immersive mode and must NOT be treated as abnormal
-            const fallbackPadding = EdgeInsets.only(top: 25, bottom: 35);
-            const maxNormalPadding = 50.0;
+            return AppleSafeAreaBuilder(
+              builder: (context, nativeInsets) {
+                final fixedMediaQueryData = resolveAppMediaQueryData(
+                  MediaQuery.of(context),
+                  applyAndroidWindowedModeWorkaround: Platform.isAndroid,
+                  nativeInsets: nativeInsets,
+                );
 
-            final mediaQueryData = MediaQuery.of(context);
-            final hasAbnormalPadding =
-                mediaQueryData.viewPadding.top > maxNormalPadding;
-
-            final fixedMediaQueryData = hasAbnormalPadding
-                ? mediaQueryData.copyWith(
-                    viewPadding: fallbackPadding,
-                    padding: fallbackPadding,
-                    textScaler: const TextScaler.linear(1.0),
-                  )
-                : mediaQueryData.copyWith(
-                    textScaler: const TextScaler.linear(1.0));
-
-            return MediaQuery(
-              data: fixedMediaQueryData,
-              child: Stack(
-                children: [
-                  //侧键返回
-                  RawGestureDetector(
-                    excludeFromSemantics: true,
-                    gestures: <Type, GestureRecognizerFactory>{
-                      FourthButtonTapGestureRecognizer:
-                          GestureRecognizerFactoryWithHandlers<
-                              FourthButtonTapGestureRecognizer>(
-                        () => FourthButtonTapGestureRecognizer(),
-                        (FourthButtonTapGestureRecognizer instance) {
-                          instance.onTapDown = (TapDownDetails details) async {
-                            //如果处于全屏状态，退出全屏
-                            if (!Platform.isAndroid && !Platform.isIOS) {
-                              if (await windowManager.isFullScreen()) {
-                                await windowManager.setFullScreen(false);
-                                return;
+                return MediaQuery(
+                  data: fixedMediaQueryData,
+                  child: Stack(
+                    children: [
+                      //侧键返回
+                      RawGestureDetector(
+                        excludeFromSemantics: true,
+                        gestures: <Type, GestureRecognizerFactory>{
+                          FourthButtonTapGestureRecognizer:
+                              GestureRecognizerFactoryWithHandlers<
+                                  FourthButtonTapGestureRecognizer>(
+                            () => FourthButtonTapGestureRecognizer(),
+                            (FourthButtonTapGestureRecognizer instance) {
+                              instance.onTapDown =
+                                  (TapDownDetails details) async {
+                                //如果处于全屏状态，退出全屏
+                                if (!Platform.isAndroid && !Platform.isIOS) {
+                                  if (await windowManager.isFullScreen()) {
+                                    await windowManager.setFullScreen(false);
+                                    return;
+                                  }
+                                }
+                                Get.back();
+                              };
+                            },
+                          ),
+                        },
+                        child: KeyboardListener(
+                          focusNode: FocusNode(),
+                          onKeyEvent: (KeyEvent event) async {
+                            if (event is KeyDownEvent &&
+                                event.logicalKey == LogicalKeyboardKey.escape) {
+                              // ESC退出全屏
+                              // 如果处于全屏状态，退出全屏
+                              if (!Platform.isAndroid && !Platform.isIOS) {
+                                if (await windowManager.isFullScreen()) {
+                                  await windowManager.setFullScreen(false);
+                                  return;
+                                }
                               }
                             }
-                            Get.back();
-                          };
-                        },
-                      ),
-                    },
-                    child: KeyboardListener(
-                      focusNode: FocusNode(),
-                      onKeyEvent: (KeyEvent event) async {
-                        if (event is KeyDownEvent &&
-                            event.logicalKey == LogicalKeyboardKey.escape) {
-                          // ESC退出全屏
-                          // 如果处于全屏状态，退出全屏
-                          if (!Platform.isAndroid && !Platform.isIOS) {
-                            if (await windowManager.isFullScreen()) {
-                              await windowManager.setFullScreen(false);
-                              return;
-                            }
-                          }
-                        }
-                      },
-                      child: child!,
-                    ),
-                  ),
-
-                  //查看DEBUG日志按钮
-                  //只在Debug、Profile模式显示
-                  Visibility(
-                    visible: !kReleaseMode,
-                    child: Positioned(
-                      right: 12,
-                      bottom: 100 + context.mediaQueryViewPadding.bottom,
-                      child: Opacity(
-                        opacity: 0.4,
-                        child: ElevatedButton(
-                          child: const Text("DEBUG LOG"),
-                          onPressed: () {
-                            Get.bottomSheet(
-                              const DebugLogPage(),
-                            );
                           },
+                          child: child!,
                         ),
                       ),
-                    ),
+
+                      //查看DEBUG日志按钮
+                      //只在Debug、Profile模式显示
+                      Visibility(
+                        visible: !kReleaseMode,
+                        child: Positioned(
+                          right: 12,
+                          bottom: 100 + fixedMediaQueryData.viewPadding.bottom,
+                          child: Opacity(
+                            opacity: 0.4,
+                            child: ElevatedButton(
+                              child: const Text("DEBUG LOG"),
+                              onPressed: () {
+                                Get.bottomSheet(
+                                  const DebugLogPage(),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             );
           },
         ),

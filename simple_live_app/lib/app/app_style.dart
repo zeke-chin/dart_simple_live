@@ -194,11 +194,12 @@ class AppStyle {
   static BorderRadius radius48 = BorderRadius.circular(48);
 
   /// 顶部状态栏的高度
-  static double get statusBarHeight => MediaQuery.of(Get.context!).padding.top;
+  static double get statusBarHeight =>
+      MediaQuery.of(Get.context!).viewPadding.top;
 
   /// 底部导航条的高度
   static double get bottomBarHeight =>
-      MediaQuery.of(Get.context!).padding.bottom;
+      MediaQuery.of(Get.context!).viewPadding.bottom;
 
   static Divider get divider => Divider(
         height: 1,

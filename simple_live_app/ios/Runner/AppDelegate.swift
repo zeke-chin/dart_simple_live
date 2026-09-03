@@ -15,9 +15,13 @@ import Flutter
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    if let engine = engineBridge.pluginRegistry as? FlutterEngine {
-      AppIntentBridge.shared.configure(with: engine.binaryMessenger)
-      AppleResourceUsageBridge.configure(binaryMessenger: engine.binaryMessenger)
+    if let registrar = engineBridge.pluginRegistry.registrar(
+      forPlugin: "SimpleLiveNativeBridge"
+    ) {
+      let messenger = registrar.messenger()
+      AppIntentBridge.shared.configure(with: messenger)
+      AppleResourceUsageBridge.configure(binaryMessenger: messenger)
+      AppleSafeAreaBridge.configure(binaryMessenger: messenger)
     }
   }
 
@@ -85,5 +89,37 @@ private enum AppleResourceUsageBridge {
       cursor = interface.ifa_next
     }
     return (Int64(clamping: receive), Int64(clamping: transmit))
+  }
+}
+
+private enum AppleSafeAreaBridge {
+  private static var channel: FlutterMethodChannel?
+
+  static func configure(binaryMessenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: "com.xycz.simple-live/safe_area",
+      binaryMessenger: binaryMessenger
+    )
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "insets" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let insets = currentWindow()?.safeAreaInsets ?? .zero
+      result([
+        "left": insets.left,
+        "top": insets.top,
+        "right": insets.right,
+        "bottom": insets.bottom,
+      ])
+    }
+    self.channel = channel
+  }
+
+  private static func currentWindow() -> UIWindow? {
+    let windows = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap(\.windows)
+    return windows.first(where: \.isKeyWindow) ?? windows.first
   }
 }
