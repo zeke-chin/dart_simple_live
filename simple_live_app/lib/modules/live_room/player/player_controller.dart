@@ -49,6 +49,7 @@ mixin PlayerMixin {
   Size? _metalFxSpatialViewportSize;
   BoxFit _metalFxSpatialFit = BoxFit.contain;
   Size? _lastMetalFxSpatialOutputSize;
+  MetalFxSpatialOutput? _lastMetalFxSpatialOutput;
   int _metalFxSpatialUpdateGeneration = 0;
   bool? _metalFxSpatialSupported;
   bool _metalFxSpatialNativeEnabled = false;
@@ -365,6 +366,7 @@ mixin PlayerMixin {
           await videoController.setMetalFxSpatial(enabled: false);
           _metalFxSpatialNativeEnabled = false;
           _lastMetalFxSpatialOutputSize = null;
+          _lastMetalFxSpatialOutput = null;
         }
         return;
       }
@@ -385,6 +387,7 @@ mixin PlayerMixin {
       );
       _metalFxSpatialNativeEnabled = true;
       _lastMetalFxSpatialOutputSize = outputSize;
+      _lastMetalFxSpatialOutput = output;
       Log.d(
         'MetalFX Spatial: source=${sourceWidth}x$sourceHeight, '
         'viewport=${viewportSize.width.toInt()}x${viewportSize.height.toInt()}, '
@@ -395,6 +398,7 @@ mixin PlayerMixin {
       Log.w('更新 MetalFX Spatial 输出尺寸失败：$e');
       _metalFxSpatialNativeEnabled = false;
       _lastMetalFxSpatialOutputSize = null;
+      _lastMetalFxSpatialOutput = null;
       try {
         await videoController.setMetalFxSpatial(enabled: false);
       } catch (_) {}
@@ -409,6 +413,7 @@ mixin PlayerMixin {
     _metalFxSpatialResizeTimer?.cancel();
     _metalFxSpatialResizeTimer = null;
     _lastMetalFxSpatialOutputSize = null;
+    _lastMetalFxSpatialOutput = null;
     _metalFxSpatialNativeEnabled = false;
     _metalFxSpatialUpdateGeneration++;
   }
@@ -423,8 +428,13 @@ mixin PlayerMixin {
     if (nvidia != null) {
       return nvidia;
     }
-    // Apple VT 超分接入后在此读取 native 输出尺寸和 process 耗时。
-    return appleVtSrStats();
+    return appleMetalFxSpatialStats(
+      enabled: _metalFxSpatialEnabled,
+      active: _metalFxSpatialNativeEnabled,
+      outputWidth: _lastMetalFxSpatialOutput?.width,
+      outputHeight: _lastMetalFxSpatialOutput?.height,
+      scale: _lastMetalFxSpatialOutput?.scale,
+    );
   }
 
   void startVideoStatsPolling() {

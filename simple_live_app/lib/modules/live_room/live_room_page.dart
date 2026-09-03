@@ -767,6 +767,17 @@ class LiveRoomPage extends GetView<LiveRoomController> {
                   ),
                 ),
               ],
+              if (Platform.isMacOS || Platform.isIOS) ...[
+                AppStyle.divider,
+                Obx(
+                  () => SettingsSwitch(
+                    title: "Apple MetalFX 视频增强",
+                    subtitle: "当前直播间立即生效",
+                    value: AppSettingsController.instance.metalFxSpatial.value,
+                    onChanged: controller.setMetalFxSpatialEnabled,
+                  ),
+                ),
+              ],
               AppStyle.divider,
               Obx(
                 () => SettingsSwitch(

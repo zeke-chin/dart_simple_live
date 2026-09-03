@@ -770,10 +770,18 @@ class LiveRoomController extends PlayerController with WidgetsBindingObserver {
                   value: AppSettingsController.instance.rtxVsr.value,
                   onChanged: setRtxVsrEnabled,
                 ),
+              if (Platform.isMacOS || Platform.isIOS)
+                SettingsSwitch(
+                  title: "Apple MetalFX 视频增强",
+                  subtitle: "当前直播间立即生效",
+                  value: AppSettingsController.instance.metalFxSpatial.value,
+                  onChanged: setMetalFxSpatialEnabled,
+                ),
               SettingsSwitch(
                 title: "显示播放信息",
                 subtitle: "在画面上显示分辨率、码率和超分状态",
-                value: AppSettingsController.instance.showPlayerVideoStats.value,
+                value:
+                    AppSettingsController.instance.showPlayerVideoStats.value,
                 onChanged:
                     AppSettingsController.instance.setShowPlayerVideoStats,
               ),

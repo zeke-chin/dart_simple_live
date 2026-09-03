@@ -24,7 +24,8 @@ void main() {
   group('super resolution backends', () {
     test('nvidia stats are omitted when disabled', () {
       expect(
-        nvidiaRtxVsrStats(enabled: false, outputWidth: 1920, outputHeight: 1080),
+        nvidiaRtxVsrStats(
+            enabled: false, outputWidth: 1920, outputHeight: 1080),
         isNull,
       );
     });
@@ -43,18 +44,30 @@ void main() {
       expect(stats?.latencyMs, isNull);
     });
 
-    test('apple stats can carry process latency for later VT SR', () {
-      final stats = appleVtSrStats(
+    test('apple stats describe active MetalFX Spatial output', () {
+      final stats = appleMetalFxSpatialStats(
+        enabled: true,
+        active: true,
+        outputWidth: 2560,
+        outputHeight: 1440,
+        scale: 2,
+      );
+
+      expect(stats?.backend, SuperResolutionBackend.appleMetalFxSpatial);
+      expect(stats?.name, 'MetalFX Spatial');
+      expect(stats?.active, isTrue);
+      expect(stats?.latencyMs, isNull);
+    });
+
+    test('apple stats stay inactive before native output is ready', () {
+      final stats = appleMetalFxSpatialStats(
         enabled: true,
         outputWidth: 2560,
         outputHeight: 1440,
         scale: 2,
-        latencyMs: 8.3,
       );
 
-      expect(stats?.backend, SuperResolutionBackend.appleVtSr);
-      expect(stats?.name, 'Apple 超分');
-      expect(stats?.latencyMs, 8.3);
+      expect(stats?.active, isFalse);
     });
   });
 
@@ -92,23 +105,23 @@ void main() {
       expect(stats.superResolutionValues, isNull);
     });
 
-    test('apple line includes latency when provided', () {
+    test('apple line shows MetalFX Spatial output and scale', () {
       final stats = PlayerVideoStats(
         sourceWidth: 1280,
         sourceHeight: 720,
-        superResolution: appleVtSrStats(
+        superResolution: appleMetalFxSpatialStats(
           enabled: true,
+          active: true,
           outputWidth: 2560,
           outputHeight: 1440,
           scale: 2,
-          latencyMs: 8.3,
         ),
       );
 
       expect(stats.superResolutionLabel, 'SR');
       expect(
         stats.superResolutionValues,
-        '2560×1440   Apple 超分   2.00×   8.3 ms',
+        '2560×1440   MetalFX Spatial   2.00×',
       );
     });
   });

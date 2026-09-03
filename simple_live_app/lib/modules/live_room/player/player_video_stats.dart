@@ -1,13 +1,13 @@
-/// 超分后端。Windows 用 RTX VSR；Apple VT 超分接入后走 [appleVtSr]。
+/// 超分后端。Windows 使用 RTX VSR；Apple 平台使用 MetalFX Spatial。
 enum SuperResolutionBackend {
   nvidiaRtxVsr,
-  appleVtSr,
+  appleMetalFxSpatial,
 }
 
 extension SuperResolutionBackendLabel on SuperResolutionBackend {
   String get label => switch (this) {
         SuperResolutionBackend.nvidiaRtxVsr => 'RTX VSR',
-        SuperResolutionBackend.appleVtSr => 'Apple 超分',
+        SuperResolutionBackend.appleMetalFxSpatial => 'MetalFX Spatial',
       };
 }
 
@@ -50,8 +50,7 @@ class PlayerVideoStats {
     this.superResolution,
   });
 
-  bool get hasSource =>
-      (sourceWidth ?? 0) > 0 && (sourceHeight ?? 0) > 0;
+  bool get hasSource => (sourceWidth ?? 0) > 0 && (sourceHeight ?? 0) > 0;
 
   String get sourceLabel => 'SRC';
 
@@ -179,25 +178,23 @@ SuperResolutionStats? nvidiaRtxVsrStats({
   );
 }
 
-/// Apple VT 超分接入后在此填充输出分辨率、倍率和 process 耗时。
-SuperResolutionStats? appleVtSrStats({
+SuperResolutionStats? appleMetalFxSpatialStats({
   bool enabled = false,
+  bool active = false,
   int? outputWidth,
   int? outputHeight,
   double? scale,
-  double? latencyMs,
 }) {
   if (!enabled) {
     return null;
   }
   return SuperResolutionStats(
-    backend: SuperResolutionBackend.appleVtSr,
+    backend: SuperResolutionBackend.appleMetalFxSpatial,
     enabled: true,
-    active: (outputWidth ?? 0) > 0 && (outputHeight ?? 0) > 0,
+    active: active && (outputWidth ?? 0) > 0 && (outputHeight ?? 0) > 0,
     outputWidth: outputWidth,
     outputHeight: outputHeight,
     scale: scale,
-    latencyMs: latencyMs,
   );
 }
 
