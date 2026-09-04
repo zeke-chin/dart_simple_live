@@ -6,7 +6,7 @@
 
 - Visual Studio 2022 Build Tools（含 C++ 桌面开发 / Windows SDK）
 - [NuGet CLI](https://www.nuget.org/downloads) 在 PATH 里（`flutter_inappwebview_windows` 用它拉 WebView2 等依赖）。确认：`nuget help`
-- Flutter 3.38（可用 fvm）
+- Flutter 3.47（可用 fvm）
 
 当前 PowerShell 若刚装过 NuGet、还找不到命令，先刷新 PATH：
 

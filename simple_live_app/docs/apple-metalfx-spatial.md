@@ -11,7 +11,7 @@
 - 第一阶段只开发、验证 macOS Apple Silicon。
 - 第二阶段补齐 iPadOS 真机支持。
 - Windows RTX VSR、Android、Linux 不改变。
-- 不抬高 App 当前的 iOS 13 与 macOS 10.15 最低部署版本。
+- 不因 MetalFX 额外抬高 App 当前的 iOS 15 与 macOS 12 最低部署版本。
 - MetalFX 不可用、初始化失败或处理失败时必须自动回退到现有 Flutter Texture。
 
 非目标：

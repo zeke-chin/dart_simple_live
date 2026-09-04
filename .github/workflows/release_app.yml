@@ -148,7 +148,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.38.3"
+          flutter-version: "3.47.2"
           cache: true
 
       - name: Restore packages
@@ -182,7 +182,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.38.3"
+          flutter-version: "3.47.2"
           cache: true
 
       - name: Restore packages
@@ -221,7 +221,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.38.3"
+          flutter-version: "3.47.2"
           cache: true
 
       - name: Enable Flutter Desktop
@@ -260,7 +260,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.38.3"
+          flutter-version: "3.47.2"
           cache: true
 
       - name: Install Dependencies
@@ -301,7 +301,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.38.3"
+          flutter-version: "3.47.2"
           cache: true
 
       - name: Enable Flutter Desktop
