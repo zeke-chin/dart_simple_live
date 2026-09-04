@@ -157,7 +157,7 @@ jobs:
 
       - name: Build APK
         working-directory: simple_live_app
-        run: flutter build apk --release --split-per-abi --dart-define=GIT_COMMIT=${{ needs.resolve.outputs.sha }}
+        run: flutter build apk --release --split-per-abi --android-skip-build-dependency-validation --dart-define=GIT_COMMIT=${{ needs.resolve.outputs.sha }}
 
       - uses: actions/upload-artifact@v5
         with:
