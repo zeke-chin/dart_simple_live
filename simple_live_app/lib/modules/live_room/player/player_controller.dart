@@ -21,6 +21,7 @@ import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/modules/live_room/player/metal_fx_spatial_output.dart';
 import 'package:simple_live_app/modules/live_room/player/player_resource_usage.dart';
+import 'package:simple_live_app/modules/live_room/player/player_shutdown.dart';
 import 'package:simple_live_app/modules/live_room/player/player_video_stats.dart';
 import 'package:simple_live_app/modules/live_room/player/rtx_vsr_output.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -1177,8 +1178,14 @@ class PlayerController extends BaseController
         PlayerDanmakuMixin,
         PlayerSystemMixin,
         PlayerGestureControlMixin {
+  late final PlayerShutdown _shutdown;
+
   @override
   void onInit() {
+    _shutdown = PlayerShutdown(
+      release: _releasePlayer,
+      listenForAppExit: Platform.isMacOS,
+    );
     initSystem();
     initStream();
     startVideoStatsPolling();
@@ -1361,16 +1368,24 @@ class PlayerController extends BaseController
     );
   }
 
-  @override
-  void onClose() async {
+  Future<void> _releasePlayer() async {
     Log.w("播放器关闭");
     if (smallWindowState.value) {
       exitSmallWindow();
     }
     disposeStream();
     disposeDanmakuController();
-    await resetSystem();
-    await player.dispose();
+    try {
+      await resetSystem();
+    } finally {
+      // 系统状态重置失败也必须解绑 mpv 的 Dart 回调。
+      await player.dispose();
+    }
+  }
+
+  @override
+  void onClose() async {
+    await _shutdown.dispose();
     super.onClose();
   }
 }
