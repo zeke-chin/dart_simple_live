@@ -21,7 +21,7 @@ class ParseController extends GetxController {
     FocusManager.instance.primaryFocus?.unfocus();
 
     var parseResult = await parse(e);
-    if (parseResult.isEmpty && parseResult.first == "") {
+    if (parseResult.isEmpty || parseResult.first == "") {
       SmartDialog.showToast("无法解析此链接");
       return;
     }
@@ -39,7 +39,7 @@ class ParseController extends GetxController {
       return;
     }
     var parseResult = await parse(e);
-    if (parseResult.isEmpty && parseResult.first == "") {
+    if (parseResult.isEmpty || parseResult.first == "") {
       SmartDialog.showToast("无法解析此链接");
       return;
     }
@@ -125,7 +125,7 @@ class ParseController extends GetxController {
     if (url.contains("douyu.com")) {
       var regExp = RegExp(r"douyu\.com/([\d|\w]+)");
       // 适配 topic_url
-      if(url.contains("topic")){
+      if (url.contains("topic")) {
         regExp = RegExp(r"[?&]rid=([\d]+)");
       }
       id = regExp.firstMatch(url)?.group(1) ?? "";
@@ -137,6 +137,13 @@ class ParseController extends GetxController {
       id = regExp.firstMatch(url)?.group(1) ?? "";
 
       return [id, Sites.allSites[Constant.kHuya]!];
+    }
+    // 关注列表链接中的数字同样是 webRid，无需请求网页或传递 anchor_id。
+    final followLiveMatch = RegExp(
+      r"www\.douyin\.com/follow/live/(\d+)(?=[/?#\s]|$)",
+    ).firstMatch(url);
+    if (followLiveMatch != null) {
+      return [followLiveMatch.group(1)!, Sites.allSites[Constant.kDouyin]!];
     }
     if (url.contains("live.douyin.com")) {
       var regExp = RegExp(r"live\.douyin\.com/([\d|\w]+)");
