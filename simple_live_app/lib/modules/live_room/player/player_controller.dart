@@ -4,6 +4,7 @@ import 'package:auto_orientation_v2/auto_orientation_v2.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:floating/floating.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -13,13 +14,13 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:volume_controller/volume_controller.dart';
-import 'package:screen_brightness/screen_brightness.dart';
 import 'package:simple_live_app/app/controller/app_settings_controller.dart';
 import 'package:simple_live_app/app/controller/base_controller.dart';
 import 'package:simple_live_app/app/custom_throttle.dart';
 import 'package:simple_live_app/app/log.dart';
 import 'package:simple_live_app/app/utils.dart';
 import 'package:simple_live_app/modules/live_room/player/metal_fx_spatial_output.dart';
+import 'package:simple_live_app/modules/live_room/player/player_device_controls.dart';
 import 'package:simple_live_app/modules/live_room/player/player_resource_usage.dart';
 import 'package:simple_live_app/modules/live_room/player/player_shutdown.dart';
 import 'package:simple_live_app/modules/live_room/player/player_video_stats.dart';
@@ -28,6 +29,11 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 mixin PlayerMixin {
+  final deviceControls = PlayerDeviceControls(
+    platform: defaultTargetPlatform,
+    onError: (error) => Log.logPrint(error),
+  );
+
   static const _rtxVsrFilterPrefix =
       'd3d11vpp=format=nv12:scaling-mode=nvidia:scale=';
   static const _rtxVsrPreScaleFilterPrefix =
@@ -726,14 +732,7 @@ mixin PlayerSystemMixin on PlayerMixin, PlayerStateMixin, PlayerDanmakuMixin {
     );
 
     await setPortraitOrientation();
-    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-      // 亮度重置,桌面平台可能会报错,暂时不处理桌面平台的亮度
-      try {
-        await ScreenBrightness.instance.resetApplicationScreenBrightness();
-      } catch (e) {
-        Log.logPrint(e);
-      }
-    }
+    await deviceControls.resetBrightness();
 
     await WakelockPlus.disable();
   }
@@ -1037,6 +1036,7 @@ mixin PlayerGestureControlMixin
   }
 
   bool verticalDragging = false;
+  int _verticalDragGeneration = 0;
   bool leftVerticalDrag = false;
   var _currentVolume = 0.0;
   var _currentBrightness = 1.0;
@@ -1058,19 +1058,39 @@ mixin PlayerGestureControlMixin
 
     verStartPosition = dy;
     leftVerticalDrag = details.globalPosition.dx < Get.width / 2;
+    final generation = ++_verticalDragGeneration;
 
     throttle = DelayedThrottle(200);
+    // 系统音量可能已通过实体按键或控制中心改变，不能沿用上次手势的缓存。
+    lastVolume = -1;
 
-    verticalDragging = true;
+    // 等系统值读取完成后再响应更新，避免快速滑动使用上一次的起始值。
+    verticalDragging = false;
     if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
       showGestureTip.value = true;
     }
-    if (Platform.isAndroid || Platform.isIOS) {
-      _currentVolume = await VolumeController.instance.getVolume();
+    // 只读取本次手势需要的值；读取失败时不使用上次手势的旧值继续调节。
+    if (leftVerticalDrag &&
+        (Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) {
+      final brightness = await deviceControls.readBrightness();
+      if (generation != _verticalDragGeneration) return;
+      if (brightness == null) {
+        verticalDragging = false;
+        showGestureTip.value = false;
+        return;
+      }
+      _currentBrightness = brightness;
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      final volume = await deviceControls.readVolume();
+      if (generation != _verticalDragGeneration) return;
+      if (volume == null) {
+        verticalDragging = false;
+        showGestureTip.value = false;
+        return;
+      }
+      _currentVolume = volume;
     }
-    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS) {
-      _currentBrightness = await ScreenBrightness.instance.application;
-    }
+    verticalDragging = true;
   }
 
   /// 竖向手势更新
@@ -1130,7 +1150,7 @@ mixin PlayerGestureControlMixin
 
   Future _realSetVolume(int volume) async {
     Log.logPrint(volume);
-    VolumeController.instance.setVolume(volume / 100);
+    await deviceControls.setVolume(volume / 100);
   }
 
   void setGestureBrightness(double dy) {
@@ -1142,7 +1162,7 @@ mixin PlayerGestureControlMixin
       if (seek < 0) {
         seek = 0;
       }
-      ScreenBrightness.instance.setApplicationScreenBrightness(seek);
+      deviceControls.setBrightness(seek);
 
       gestureTipText.value = "亮度 ${(seek * 100).toInt()}%";
       Log.logPrint(value);
@@ -1153,7 +1173,7 @@ mixin PlayerGestureControlMixin
         seek = 1;
       }
 
-      ScreenBrightness.instance.setApplicationScreenBrightness(seek);
+      deviceControls.setBrightness(seek);
       gestureTipText.value = "亮度 ${(seek * 100).toInt()}%";
       Log.logPrint(value);
     }
@@ -1161,6 +1181,7 @@ mixin PlayerGestureControlMixin
 
   /// 竖向手势完成
   void onVerticalDragEnd(DragEndDetails details) async {
+    _verticalDragGeneration++;
     if (lockControlsState.value && fullScreenState.value) {
       return;
     }
@@ -1189,8 +1210,11 @@ class PlayerController extends BaseController
     initSystem();
     initStream();
     startVideoStatsPolling();
-    //设置音量
-    player.setVolume(AppSettingsController.instance.playerVolume.value);
+    // iOS 只通过系统媒体音量调节响度，播放器保持原始增益。
+    player.setVolume(
+      deviceControls
+          .playerVolume(AppSettingsController.instance.playerVolume.value),
+    );
     super.onInit();
   }
 
